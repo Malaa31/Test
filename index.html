@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#E8EDF2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1924" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Carnet">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-180.png">
+<title>Carnet de visites</title>
+<style>
+:root{
+  --calque:#E8EDF2; --feuille:#FBFCFD; --encre:#14263A; --encre-2:#4B5E72;
+  --trait:#1F5FA8; --sur-trait:#FFFFFF; --filet:#C5D2DF;
+  --repere:#F0A21A; --ok:#2B7A58; --rebut:#B4372F;
+  --titre:Bahnschrift,"DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --texte:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --calque:#0E1924; --feuille:#162532; --encre:#E4ECF4; --encre-2:#9FB2C5;
+    --trait:#78AEEC; --sur-trait:#0E1924; --filet:#2C4053;
+    --ok:#5CC29A; --rebut:#F0827A;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--calque);color:var(--encre);font:16px/1.5 var(--texte)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--repere);outline-offset:2px}
+.page{max-width:720px;margin:0 auto;padding:16px 16px 32px}
+
+.tete{padding:8px 0 16px}
+.tete h1{margin:0;font:600 1.875rem/1.1 var(--titre);letter-spacing:.01em}
+.etat{margin:4px 0 0;font-size:.875rem;color:var(--encre-2)}
+.etat.alerte{color:var(--rebut);font-weight:600}
+
+.retour{border:0;background:none;padding:10px 0;margin:-6px 0 6px;color:var(--trait);font:600 1rem var(--titre)}
+
+.btn{min-height:48px;padding:10px 16px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille);font:600 1.0625rem var(--titre)}
+.btn.principal{background:var(--trait);border-color:var(--trait);color:var(--sur-trait)}
+.btn.danger{border-color:var(--rebut);color:var(--rebut)}
+.btn.large{width:100%}
+.rangee{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.rangee .btn{flex:1 1 150px}
+
+.vide{padding:28px 0 20px}
+.vide-titre{margin:0 0 4px;font:600 1.375rem/1.2 var(--titre)}
+.vide p{margin:0;color:var(--encre-2)}
+.vide p.vide-titre{color:var(--encre)}
+
+.liste{margin-bottom:16px;background:var(--feuille);border-top:2px solid var(--encre)}
+.ligne{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:64px;padding:10px 12px;border:0;border-bottom:1px solid var(--filet);background:none;text-align:left}
+.ligne-nom{display:block;font:600 1.1875rem/1.2 var(--titre)}
+.ligne-meta{display:block;font-size:.875rem;color:var(--encre-2)}
+.ligne-droite{flex:none;text-align:right}
+.ligne-note{display:block;font:600 1.25rem/1.1 var(--titre)}
+
+.avis{display:inline-block;padding:1px 7px;border:1px solid currentColor;border-radius:2px;font:600 .8125rem var(--titre)}
+.avis.retenir{color:var(--ok)}
+.avis.creuser{color:var(--encre-2)}
+.avis.ecarter{color:var(--rebut)}
+
+.outils{margin-top:28px;padding-top:16px;border-top:1px solid var(--filet)}
+.outils h2{margin:0 0 2px;font:600 1.0625rem var(--titre)}
+.outils p{margin:0 0 4px;font-size:.875rem;color:var(--encre-2)}
+.outils select{min-height:48px;margin-top:8px;padding:8px 10px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille)}
+
+/* Le cartouche : le bloc titre d'un plan technique */
+.cartouche{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--encre);background:var(--feuille)}
+.case{display:flex;flex-direction:column;padding:6px 10px 8px;border-bottom:1px solid var(--encre)}
+.case.pleine{grid-column:1/-1}
+.case.gauche{border-right:1px solid var(--encre)}
+.case.derniere{border-bottom:0}
+.case label{font:500 .8125rem var(--titre);color:var(--encre-2)}
+.case input{width:100%;min-height:32px;padding:2px 0;border:0;border-radius:0;background:transparent;outline:none}
+.case.nom input{font:600 1.5rem/1.2 var(--titre)}
+.case:focus-within{box-shadow:inset 0 0 0 3px var(--repere)}
+
+.astuce{margin:12px 0 0;font-size:.875rem;color:var(--encre-2)}
+
+.bloc{padding:18px 0;border-bottom:1px solid var(--filet)}
+.bloc-tete{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px}
+.bloc h2{margin:0;font:600 1.1875rem/1.25 var(--titre)}
+.aide{margin:2px 0 10px;font-size:.875rem;color:var(--encre-2)}
+.bloc-tete + .zone{margin-top:10px}
+
+.jauge{display:flex}
+.jauge button{width:42px;height:42px;padding:0;border:1px solid var(--encre);border-left-width:0;border-radius:0;background:var(--feuille);font:600 1rem var(--titre)}
+.jauge button:first-child{border-left-width:1px}
+.jauge button.plein{background:var(--trait);color:var(--sur-trait)}
+
+.zone{position:relative}
+textarea{display:block;width:100%;min-height:88px;padding:10px 12px;border:1px solid var(--filet);border-radius:2px;background:var(--feuille);resize:vertical}
+.zone.avec-mic textarea{padding-bottom:56px}
+.mic{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px 0 10px;border:1px solid var(--encre);border-radius:20px;background:var(--feuille);font:600 .9375rem var(--titre)}
+.mic svg{width:18px;height:18px;display:block}
+.mic.actif{background:var(--repere);border-color:var(--repere);color:#14263A}
+.mic.actif svg{animation:battement 1.2s ease-in-out infinite}
+@keyframes battement{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.mic.actif svg{animation:none}}
+
+.choix{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.choix button{flex:1 1 110px;min-height:48px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille);font:600 1rem var(--titre)}
+.choix button.pris{background:var(--encre);color:var(--calque)}
+
+.barre{position:sticky;bottom:0;display:flex;gap:8px;margin:24px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--calque);border-top:1px solid var(--filet)}
+.barre .btn{flex:1}
+.fin{margin-top:16px}
+
+.tableau{overflow-x:auto;background:var(--feuille);border-top:2px solid var(--encre)}
+table{width:100%;border-collapse:collapse;font-size:.9375rem}
+th,td{padding:10px 8px;border-bottom:1px solid var(--filet);text-align:center;white-space:nowrap}
+th{font:600 .875rem var(--titre);color:var(--encre-2)}
+td:first-child,th:first-child{text-align:left;padding-left:12px}
+td.nom-col{font:600 1.0625rem var(--titre)}
+td.moy{font:600 1.0625rem var(--titre)}
+
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10;max-width:420px;margin:0 auto;padding:12px 14px;border-radius:2px;background:var(--encre);color:var(--calque);font-size:.9375rem;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.vu{opacity:1}
+.hors{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="tete">
+    <h1>Carnet de visites</h1>
+    <p class="etat" id="etat"></p>
+  </header>
+  <main id="vue"></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+'use strict';
+
+var CLE='carnet-visites-v1';
+
+var CRITERES=[
+  {k:'capacite',t:'Capacité et moyens',c:'Capacité',a:'Parc machines, charge actuelle, capacité disponible, effectif.'},
+  {k:'qualite',t:'Qualité et certifications',c:'Qualité',a:'EN 9100, Nadcap, moyens de contrôle, traitement des non-conformités.'},
+  {k:'procedes',t:'Procédés et technique',c:'Procédés',a:'Procédés spéciaux, savoir-faire, niveau technique des équipes.'},
+  {k:'orga',t:'Organisation et management',c:'Organisation',a:'Pilotage, indicateurs, réactivité, niveau d\u2019anglais des interlocuteurs.'},
+  {k:'supply',t:'Supply chain et matière',c:'Supply',a:'Appros matière, sous-traitance, délais, logistique export.'},
+  {k:'atelier',t:'Tenue de l\u2019atelier',c:'Atelier',a:'Propreté, sécurité, flux, état des machines. Ce que tu as vu, pas ce qu\u2019on t\u2019a dit.'}
+];
+var SYNTHESE=[
+  {k:'forts',t:'Points forts'},
+  {k:'risques',t:'Risques et points faibles'},
+  {k:'suites',t:'Suites à donner'}
+];
+var AVIS=[
+  {k:'retenir',t:'À retenir'},
+  {k:'creuser',t:'À creuser'},
+  {k:'ecarter',t:'À écarter'}
+];
+
+var SR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
+var ANDROID=/Android/i.test(navigator.userAgent||'');
+
+/* ---------- Données ---------- */
+
+var stockageOK=true, derniereSauvegarde=null, minuteur=null, horsLigne=false;
+var etat=charger()||{visits:[],lang:'fr-FR'};
+if(!Array.isArray(etat.visits)) etat.visits=[];
+etat.visits=etat.visits.map(normaliser);
+if(!etat.lang) etat.lang='fr-FR';
+
+function charger(){
+  try{
+    localStorage.setItem(CLE+'-test','1');
+    localStorage.removeItem(CLE+'-test');
+    var s=localStorage.getItem(CLE);
+    return s?JSON.parse(s):null;
+  }catch(e){ stockageOK=false; return null; }
+}
+function sauver(){
+  clearTimeout(minuteur); minuteur=null;
+  try{
+    localStorage.setItem(CLE,JSON.stringify(etat));
+    stockageOK=true; derniereSauvegarde=new Date();
+  }catch(e){ stockageOK=false; }
+  afficherEtat();
+}
+function sauverBientot(){
+  if(minuteur) clearTimeout(minuteur);
+  minuteur=setTimeout(sauver,400);
+}
+function normaliser(v){
+  v=v||{};
+  return {
+    id:String(v.id||nouvelId()),
+    nom:v.nom||'', ville:v.ville||'', date:v.date||'',
+    contacts:v.contacts||'', activite:v.activite||'',
+    libre:v.libre||'',
+    scores:(v.scores&&typeof v.scores==='object')?v.scores:{},
+    notes:(v.notes&&typeof v.notes==='object')?v.notes:{},
+    forts:v.forts||'', risques:v.risques||'', suites:v.suites||'',
+    avis:v.avis||'', cree:v.cree||Date.now()
+  };
+}
+function nouvelId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function aujourdhui(){
+  var d=new Date();
+  return d.getFullYear()+'-'+deux(d.getMonth()+1)+'-'+deux(d.getDate());
+}
+function deux(n){ return (n<10?'0':'')+n; }
+function trouver(id){
+  for(var i=0;i<etat.visits.length;i++) if(etat.visits[i].id===id) return etat.visits[i];
+  return null;
+}
+function moyenne(v){
+  var s=0,n=0;
+  CRITERES.forEach(function(c){ var x=Number(v.scores[c.k])||0; if(x>0){ s+=x; n++; } });
+  return n?s/n:null;
+}
+function nombre(x){ return x.toFixed(1).replace('.',','); }
+function dateFr(iso){
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');
+  return m?m[3]+'/'+m[2]+'/'+m[1]:(iso||'');
+}
+function libelleAvis(k){
+  for(var i=0;i<AVIS.length;i++) if(AVIS[i].k===k) return AVIS[i].t;
+  return '';
+}
+function parDate(liste){
+  return liste.slice().sort(function(a,b){
+    if(a.date!==b.date) return a.date<b.date?-1:1;
+    return a.cree-b.cree;
+  });
+}
+function nomOu(v){ return v.nom.trim()||'Visite sans nom'; }
+
+/* ---------- Comptes rendus ---------- */
+
+function crTexte(v){
+  var L=['Compte rendu de visite',''];
+  L.push('Entreprise : '+(v.nom.trim()||'à compléter'));
+  if(v.ville.trim()) L.push('Ville : '+v.ville.trim());
+  if(v.date) L.push('Date : '+dateFr(v.date));
+  if(v.contacts.trim()) L.push('Interlocuteurs : '+v.contacts.trim());
+  if(v.activite.trim()) L.push('Activité : '+v.activite.trim());
+  var m=moyenne(v);
+  if(m!==null) L.push('Note moyenne : '+nombre(m)+'/5');
+  if(v.avis) L.push('Avis : '+libelleAvis(v.avis));
+  if(v.libre.trim()) L.push('','Débrief à chaud',v.libre.trim());
+  CRITERES.forEach(function(c){
+    var s=Number(v.scores[c.k])||0, n=(v.notes[c.k]||'').trim();
+    if(!s&&!n) return;
+    L.push('',c.t+(s?' ('+s+'/5)':''));
+    if(n) L.push(n);
+  });
+  SYNTHESE.forEach(function(c){
+    var n=(v[c.k]||'').trim();
+    if(n) L.push('',c.t,n);
+  });
+  return L.join('\n');
+}
+function classement(){
+  return etat.visits.slice().sort(function(a,b){
+    var ma=moyenne(a), mb=moyenne(b);
+    if(ma===null&&mb===null) return 0;
+    if(ma===null) return 1;
+    if(mb===null) return -1;
+    return mb-ma;
+  });
+}
+function toutTexte(){
+  var L=['Comparatif des visites',''];
+  classement().forEach(function(v,i){
+    var m=moyenne(v), bouts=[];
+    if(m!==null) bouts.push(nombre(m)+'/5');
+    if(v.avis) bouts.push(libelleAvis(v.avis));
+    L.push((i+1)+'. '+nomOu(v)+(v.ville.trim()?' ('+v.ville.trim()+')':'')+(bouts.length?' : '+bouts.join(', '):''));
+  });
+  parDate(etat.visits).forEach(function(v){
+    L.push('','----------------------------------------','',crTexte(v));
+  });
+  return L.join('\n');
+}
+function nomFichier(v){
+  var base=(v.nom.trim()||'visite').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'visite';
+  return 'CR-'+base+(v.date?'-'+v.date:'')+'.txt';
+}
+
+/* ---------- Petits outils d'interface ---------- */
+
+function h(tag,attrs){
+  var el=document.createElement(tag), k, v;
+  if(attrs) for(k in attrs){
+    v=attrs[k];
+    if(v===null||v===undefined||v===false) continue;
+    if(k==='class') el.className=v;
+    else if(k==='text') el.textContent=v;
+    else if(k.slice(0,2)==='on') el.addEventListener(k.slice(2),v);
+    else el.setAttribute(k,v===true?'':v);
+  }
+  for(var i=2;i<arguments.length;i++) ajouter(el,arguments[i]);
+  return el;
+}
+function ajouter(el,c){
+  if(c===null||c===undefined||c===false) return;
+  if(Array.isArray(c)){ c.forEach(function(x){ ajouter(el,x); }); return; }
+  el.appendChild(c.nodeType?c:document.createTextNode(String(c)));
+}
+var minuteurToast=null;
+function toast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('vu');
+  clearTimeout(minuteurToast);
+  minuteurToast=setTimeout(function(){ t.classList.remove('vu'); },3200);
+}
+function afficherEtat(){
+  var p=document.getElementById('etat');
+  if(!stockageOK){
+    p.className='etat alerte';
+    p.textContent='Sauvegarde automatique indisponible ici. Télécharge tes CR avant de fermer.';
+  }else{
+    p.className='etat';
+    p.textContent=(derniereSauvegarde
+      ?'Enregistré sur cet appareil à '+deux(derniereSauvegarde.getHours())+':'+deux(derniereSauvegarde.getMinutes())+'.'
+      :'Tes notes restent sur cet appareil.')+(horsLigne?' Prête hors ligne.':'');
+  }
+}
+function grandir(ta){
+  ta.style.height='auto';
+  ta.style.height=(ta.scrollHeight+2)+'px';
+}
+function copier(txt,ok){
+  function repli(){
+    var ta=h('textarea',{class:'hors','aria-hidden':'true'});
+    ta.value=txt; document.body.appendChild(ta); ta.select();
+    var r=false; try{ r=document.execCommand('copy'); }catch(e){}
+    document.body.removeChild(ta); return r;
+  }
+  function bilan(r){ toast(r?ok:'Copie impossible ici. Utilise Télécharger.'); }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ bilan(true); },function(){ bilan(repli()); });
+  }else bilan(repli());
+}
+function telecharger(nom,contenu,type){
+  try{
+    var blob=new Blob([contenu],{type:type});
+    var url=URL.createObjectURL(blob);
+    var a=h('a',{href:url,download:nom,class:'hors'});
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); },1500);
+    toast('Téléchargé : '+nom);
+  }catch(e){ toast('Téléchargement impossible ici. Utilise Copier.'); }
+}
+function telechargerTexte(nom,txt){ telecharger(nom,'\uFEFF'+txt,'text/plain;charset=utf-8'); }
+
+/* ---------- Dictée ---------- */
+
+var dictee=null;
+
+function arreterDictee(){
+  var d=dictee; if(!d) return;
+  dictee=null; d.actif=false;
+  try{ if(d.rec) d.rec.stop(); }catch(e){}
+  d.btn.classList.remove('actif');
+  d.btn.setAttribute('aria-pressed','false');
+  d.btn.querySelector('.mic-txt').textContent='Dicter';
+}
+function basculerDictee(btn,ta){
+  if(dictee){
+    var meme=dictee.btn===btn;
+    arreterDictee();
+    if(meme) return;
+  }
+  dictee={btn:btn,ta:ta,actif:true,rec:null,courts:0};
+  btn.classList.add('actif');
+  btn.setAttribute('aria-pressed','true');
+  btn.querySelector('.mic-txt').textContent='Arrêter';
+  ecouter(dictee);
+}
+function ecouter(d){
+  var rec, debut=Date.now();
+  try{ rec=new SR(); }catch(e){ echecDictee(d,'Dictée indisponible ici. Utilise le micro de ton clavier.'); return; }
+  d.rec=rec;
+  rec.lang=etat.lang||'fr-FR';
+  rec.interimResults=true;
+  rec.continuous=!ANDROID;
+  var base=d.ta.value.replace(/\s+$/,'');
+  if(base) base+=' ';
+  rec.onresult=function(e){
+    var fin='',prov='';
+    for(var i=0;i<e.results.length;i++){
+      var r=e.results[i], t=r[0].transcript;
+      if(r.isFinal) fin+=t.trim()+' '; else prov+=t;
+    }
+    d.ta.value=base+fin+prov;
+    d.ta.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  rec.onerror=function(e){
+    if(e.error==='no-speech'||e.error==='aborted') return;
+    d.actif=false;
+    toast(e.error==='not-allowed'||e.error==='service-not-allowed'
+      ?'Micro refusé. Autorise-le dans le navigateur, ou utilise le micro du clavier.'
+      :e.error==='network'
+      ?'Pas de connexion pour la dictée. Utilise le micro du clavier.'
+      :'Dictée interrompue. Réessaie, ou utilise le micro du clavier.');
+  };
+  rec.onend=function(){
+    if(dictee!==d) return;
+    d.courts=(Date.now()-debut<600)?d.courts+1:0;
+    if(d.actif&&d.courts<3){ ecouter(d); return; }
+    arreterDictee();
+  };
+  try{ rec.start(); }catch(e){ echecDictee(d,'Dictée indisponible ici. Utilise le micro de ton clavier.'); }
+}
+function echecDictee(d,msg){
+  if(dictee===d) arreterDictee();
+  toast(msg);
+}
+function icone(){
+  var s=h('span',{'aria-hidden':'true'});
+  s.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+  return s;
+}
+
+/* ---------- Champs ---------- */
+
+function zone(obj,cle,nom,id,lignes,invite){
+  var ta=h('textarea',{id:id,rows:lignes||3,placeholder:invite||null,'aria-label':nom});
+  ta.value=obj[cle]||'';
+  ta.addEventListener('input',function(){ obj[cle]=ta.value; grandir(ta); sauverBientot(); });
+  ta.addEventListener('keydown',function(){ if(dictee&&dictee.ta===ta) arreterDictee(); });
+  var z=h('div',{class:'zone'+(SR?' avec-mic':'')},ta);
+  if(SR){
+    var b=h('button',{type:'button',class:'mic','aria-pressed':'false','aria-label':'Dicter : '+nom},
+      icone(),h('span',{class:'mic-txt',text:'Dicter'}));
+    b.addEventListener('click',function(){ basculerDictee(b,ta); });
+    z.appendChild(b);
+  }
+  return z;
+}
+function caseCartouche(v,cle,nom,classe,type,invite){
+  var id='c-'+cle;
+  var inp=h('input',{id:id,type:type||'text',placeholder:invite||null,autocomplete:'off'});
+  inp.value=v[cle]||'';
+  inp.addEventListener('input',function(){ v[cle]=inp.value; sauverBientot(); });
+  return h('div',{class:'case '+classe},h('label',{for:id,text:nom}),inp);
+}
+function jauge(v,c){
+  var g=h('div',{class:'jauge',role:'group','aria-label':'Note : '+c.t});
+  var boutons=[];
+  function peindre(){
+    var s=Number(v.scores[c.k])||0;
+    boutons.forEach(function(b,i){
+      b.classList.toggle('plein',i<s);
+      b.setAttribute('aria-pressed',String(i+1===s));
+    });
+  }
+  for(var n=1;n<=5;n++){
+    (function(n){
+      var b=h('button',{type:'button','aria-label':n+' sur 5',text:String(n)});
+      b.addEventListener('click',function(){
+        v.scores[c.k]=(Number(v.scores[c.k])===n)?0:n;
+        peindre(); sauverBientot();
+      });
+      boutons.push(b); g.appendChild(b);
+    })(n);
+  }
+  peindre();
+  return g;
+}
+
+/* ---------- Vues ---------- */
+
+function vueListe(){
+  var f=document.createDocumentFragment();
+
+  if(!etat.visits.length){
+    f.appendChild(h('div',{class:'vide'},
+      h('p',{class:'vide-titre',text:'Aucune visite pour l\u2019instant.'}),
+      h('p',{text:'Crée la fiche avant d\u2019entrer sur le site. Tu dictes le reste en sortant.'})));
+  }else{
+    var liste=h('div',{class:'liste'});
+    parDate(etat.visits).forEach(function(v){
+      var m=moyenne(v);
+      var meta=[v.ville.trim(),dateFr(v.date)].filter(Boolean).join(', ');
+      liste.appendChild(h('button',{type:'button',class:'ligne',onclick:function(){ aller('visite-'+v.id); }},
+        h('span',null,
+          h('span',{class:'ligne-nom',text:nomOu(v)}),
+          meta?h('span',{class:'ligne-meta',text:meta}):null),
+        h('span',{class:'ligne-droite'},
+          m!==null?h('span',{class:'ligne-note',text:nombre(m)+'/5'}):null,
+          v.avis?h('span',{class:'avis '+v.avis,text:libelleAvis(v.avis)}):null)));
+    });
+    f.appendChild(liste);
+  }
+
+  f.appendChild(h('button',{type:'button',class:'btn principal large',onclick:creer},'Nouvelle visite'));
+  if(etat.visits.length>=2){
+    f.appendChild(h('div',{class:'rangee'},
+      h('button',{type:'button',class:'btn',onclick:function(){ aller('comparer'); }},'Comparer les visites')));
+  }
+  if(etat.visits.length){
+    f.appendChild(h('div',{class:'rangee'},
+      h('button',{type:'button',class:'btn',onclick:function(){ copier(toutTexte(),'Tous les CR copiés'); }},'Copier tous les CR'),
+      h('button',{type:'button',class:'btn',onclick:function(){ telechargerTexte('CR-visites-'+aujourdhui()+'.txt',toutTexte()); }},'Télécharger tous les CR')));
+  }
+
+  var fichier=h('input',{type:'file',accept:'.json,application/json',class:'hors','aria-hidden':'true',tabindex:'-1'});
+  fichier.addEventListener('change',function(){ restaurer(fichier); });
+  f.appendChild(h('section',{class:'outils'},
+    h('h2',{text:'Copie de secours'}),
+    h('p',{text:'Les notes vivent dans ce navigateur, sur cet appareil. Enregistre une copie chaque soir.'}),
+    h('div',{class:'rangee'},
+      etat.visits.length?h('button',{type:'button',class:'btn',onclick:function(){
+        telecharger('carnet-visites-'+aujourdhui()+'.json',JSON.stringify(etat,null,2),'application/json');
+      }},'Enregistrer une copie'):null,
+      h('button',{type:'button',class:'btn',onclick:function(){ fichier.click(); }},'Restaurer une copie')),
+    fichier));
+
+  if(SR){
+    var sel=h('select',{id:'langue','aria-label':'Langue de dictée'},
+      h('option',{value:'fr-FR',text:'Je dicte en français'}),
+      h('option',{value:'en-GB',text:'Je dicte en anglais'}));
+    sel.value=etat.lang;
+    sel.addEventListener('change',function(){ etat.lang=sel.value; sauver(); });
+    f.appendChild(h('section',{class:'outils'},
+      h('h2',{text:'Dictée'}),
+      h('p',{text:'Le bouton Dicter passe par le service vocal du navigateur et demande une connexion. Sans réseau, le micro du clavier fonctionne dans tous les champs.'}),
+      sel));
+  }
+  return f;
+}
+
+function vueVisite(v){
+  var f=document.createDocumentFragment();
+  f.appendChild(h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},'Toutes les visites'));
+
+  f.appendChild(h('div',{class:'cartouche'},
+    caseCartouche(v,'nom','Entreprise','pleine nom','text','Nom de l\u2019entreprise'),
+    caseCartouche(v,'ville','Ville','gauche','text'),
+    caseCartouche(v,'date','Date','','date'),
+    caseCartouche(v,'contacts','Interlocuteurs','pleine','text','Noms et fonctions'),
+    caseCartouche(v,'activite','Activité','pleine derniere','text','Métier, pièces, clients')));
+
+  if(!SR) f.appendChild(h('p',{class:'astuce',text:'Pour dicter, touche un champ puis le micro de ton clavier.'}));
+
+  f.appendChild(h('section',{class:'bloc'},
+    h('h2',{text:'Débrief à chaud'}),
+    h('p',{class:'aide',text:'Dis tout ce qui te vient en sortant du site. Tu trieras ensuite.'}),
+    zone(v,'libre','Débrief à chaud','z-libre',5)));
+
+  CRITERES.forEach(function(c){
+    f.appendChild(h('section',{class:'bloc'},
+      h('div',{class:'bloc-tete'},h('h2',{text:c.t}),jauge(v,c)),
+      h('p',{class:'aide',text:c.a}),
+      zone(v.notes,c.k,c.t,'z-'+c.k,3)));
+  });
+
+  SYNTHESE.forEach(function(c){
+    f.appendChild(h('section',{class:'bloc'},
+      h('div',{class:'bloc-tete'},h('h2',{text:c.t})),
+      zone(v,c.k,c.t,'z-'+c.k,3)));
+  });
+
+  var choix=h('div',{class:'choix',role:'group','aria-label':'Avis'});
+  var boutons=[];
+  function peindre(){
+    boutons.forEach(function(b){
+      var pris=b.getAttribute('data-k')===v.avis;
+      b.classList.toggle('pris',pris);
+      b.setAttribute('aria-pressed',String(pris));
+    });
+  }
+  AVIS.forEach(function(a){
+    var b=h('button',{type:'button','data-k':a.k,text:a.t});
+    b.addEventListener('click',function(){ v.avis=(v.avis===a.k)?'':a.k; peindre(); sauverBientot(); });
+    boutons.push(b); choix.appendChild(b);
+  });
+  peindre();
+  f.appendChild(h('section',{class:'bloc'},h('h2',{text:'Avis'}),choix));
+
+  var suppr=h('button',{type:'button',class:'btn danger',text:'Supprimer la visite'});
+  var arme=false, minuteurSuppr=null;
+  suppr.addEventListener('click',function(){
+    if(!arme){
+      arme=true; suppr.textContent='Confirmer la suppression';
+      minuteurSuppr=setTimeout(function(){ arme=false; suppr.textContent='Supprimer la visite'; },4000);
+      return;
+    }
+    clearTimeout(minuteurSuppr);
+    etat.visits=etat.visits.filter(function(x){ return x.id!==v.id; });
+    sauver(); toast('Visite supprimée'); aller('');
+  });
+  f.appendChild(h('div',{class:'rangee fin'},
+    h('button',{type:'button',class:'btn',onclick:function(){ telechargerTexte(nomFichier(v),crTexte(v)); }},'Télécharger le CR'),
+    suppr));
+
+  f.appendChild(h('div',{class:'barre'},
+    h('button',{type:'button',class:'btn principal',onclick:function(){ copier(crTexte(v),'CR copié'); }},'Copier le CR'),
+    navigator.share?h('button',{type:'button',class:'btn',onclick:function(){
+      navigator.share({title:'CR '+nomOu(v),text:crTexte(v)}).catch(function(){});
+    }},'Partager le CR'):null));
+  return f;
+}
+
+function vueComparer(){
+  var f=document.createDocumentFragment();
+  f.appendChild(h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},'Toutes les visites'));
+  var tete=h('tr',null,h('th',{scope:'col',text:'Entreprise'}),h('th',{scope:'col',text:'Moyenne'}));
+  CRITERES.forEach(function(c){ tete.appendChild(h('th',{scope:'col',text:c.c})); });
+  tete.appendChild(h('th',{scope:'col',text:'Avis'}));
+  var corps=h('tbody');
+  classement().forEach(function(v){
+    var m=moyenne(v);
+    var tr=h('tr',null,
+      h('td',{class:'nom-col',text:nomOu(v)}),
+      h('td',{class:'moy',text:m!==null?nombre(m):'\u2013'}));
+    CRITERES.forEach(function(c){
+      var s=Number(v.scores[c.k])||0;
+      tr.appendChild(h('td',{text:s?String(s):'\u2013'}));
+    });
+    tr.appendChild(h('td',null,v.avis?h('span',{class:'avis '+v.avis,text:libelleAvis(v.avis)}):'\u2013'));
+    corps.appendChild(tr);
+  });
+  f.appendChild(h('div',{class:'tableau'},h('table',null,h('thead',null,tete),corps)));
+  f.appendChild(h('p',{class:'astuce',text:'Classées par note moyenne. Les notes vont de 1 à 5.'}));
+  f.appendChild(h('div',{class:'rangee'},
+    h('button',{type:'button',class:'btn',onclick:function(){ copier(toutTexte(),'Tous les CR copiés'); }},'Copier tous les CR')));
+  return f;
+}
+
+/* ---------- Actions et navigation ---------- */
+
+function creer(){
+  var v=normaliser({date:aujourdhui()});
+  etat.visits.push(v);
+  sauver();
+  aller('visite-'+v.id);
+}
+function restaurer(input){
+  var fic=input.files&&input.files[0];
+  if(!fic) return;
+  var lecteur=new FileReader();
+  lecteur.onload=function(){
+    try{
+      var d=JSON.parse(String(lecteur.result).replace(/^\uFEFF/,''));
+      if(!d||!Array.isArray(d.visits)) throw new Error('format');
+      var n=0;
+      d.visits.forEach(function(x){
+        var v=normaliser(x), i=-1;
+        etat.visits.forEach(function(y,j){ if(y.id===v.id) i=j; });
+        if(i>=0) etat.visits[i]=v; else etat.visits.push(v);
+        n++;
+      });
+      sauver(); rendre();
+      toast(n+(n>1?' visites restaurées':' visite restaurée'));
+    }catch(e){ toast('Ce fichier n\u2019est pas une copie du carnet.'); }
+    input.value='';
+  };
+  lecteur.onerror=function(){ toast('Lecture du fichier impossible.'); };
+  lecteur.readAsText(fic);
+}
+
+var vue={nom:'liste',id:null};
+function lireRoute(){
+  var r=(location.hash||'').slice(1);
+  if(r==='comparer'&&etat.visits.length) return {nom:'comparer',id:null};
+  if(r.indexOf('visite-')===0&&trouver(r.slice(7))) return {nom:'visite',id:r.slice(7)};
+  return {nom:'liste',id:null};
+}
+function rendre(){
+  arreterDictee();
+  var cible=document.getElementById('vue');
+  cible.textContent='';
+  if(vue.nom==='visite') cible.appendChild(vueVisite(trouver(vue.id)));
+  else if(vue.nom==='comparer') cible.appendChild(vueComparer());
+  else cible.appendChild(vueListe());
+  var zones=cible.querySelectorAll('textarea');
+  for(var i=0;i<zones.length;i++) grandir(zones[i]);
+  afficherEtat();
+}
+function afficherRoute(){
+  vue=lireRoute();
+  rendre();
+  window.scrollTo(0,0);
+}
+function aller(route){
+  if((location.hash||'').slice(1)===route){ afficherRoute(); return; }
+  try{ location.hash=route; }catch(e){}
+  if((location.hash||'').slice(1)!==route){
+    /* Navigation par ancre bloquée : on affiche directement. */
+    if(route==='comparer') vue={nom:'comparer',id:null};
+    else if(route.indexOf('visite-')===0) vue={nom:'visite',id:route.slice(7)};
+    else vue={nom:'liste',id:null};
+    rendre(); window.scrollTo(0,0);
+  }
+}
+
+window.addEventListener('hashchange',afficherRoute);
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){ arreterDictee(); if(minuteur) sauver(); }
+});
+window.addEventListener('pagehide',function(){ if(minuteur) sauver(); });
+
+afficherRoute();
+
+/* ---------- Version en ligne : ouverture sans réseau ---------- */
+
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+  navigator.serviceWorker.ready.then(function(){ horsLigne=true; afficherEtat(); }).catch(function(){});
+}
+if(navigator.storage&&navigator.storage.persist){
+  try{ navigator.storage.persist().catch(function(){}); }catch(e){}
+}
+})();
+</script>
+</body>
+</html>
