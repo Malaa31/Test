@@ -1,0 +1,130 @@
+:root{
+  --calque:#E8EDF2; --feuille:#FBFCFD; --encre:#14263A; --encre-2:#4B5E72;
+  --trait:#1F5FA8; --sur-trait:#FFFFFF; --filet:#C5D2DF;
+  --repere:#F0A21A; --ok:#2B7A58; --rebut:#B4372F;
+  --titre:Bahnschrift,"DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --texte:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --calque:#0E1924; --feuille:#162532; --encre:#E4ECF4; --encre-2:#9FB2C5;
+    --trait:#78AEEC; --sur-trait:#0E1924; --filet:#2C4053;
+    --ok:#5CC29A; --rebut:#F0827A;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--calque);color:var(--encre);font:16px/1.5 var(--texte)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--repere);outline-offset:2px}
+.page{max-width:720px;margin:0 auto;padding:16px 16px 32px}
+
+.tete{padding:8px 0 16px}
+.tete h1{margin:0;font:600 1.875rem/1.1 var(--titre);letter-spacing:.01em}
+.etat{margin:4px 0 0;font-size:.875rem;color:var(--encre-2)}
+.etat.alerte{color:var(--rebut);font-weight:600}
+
+.retour{border:0;background:none;padding:10px 0;margin:-6px 0 6px;color:var(--trait);font:600 1rem var(--titre)}
+
+.btn{min-height:48px;padding:10px 16px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille);font:600 1.0625rem var(--titre)}
+.btn.principal{background:var(--trait);border-color:var(--trait);color:var(--sur-trait)}
+.btn.danger{border-color:var(--rebut);color:var(--rebut)}
+.btn.large{width:100%}
+.rangee{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.rangee .btn{flex:1 1 150px}
+
+.vide{padding:28px 0 20px}
+.vide-titre{margin:0 0 4px;font:600 1.375rem/1.2 var(--titre)}
+.vide p{margin:0;color:var(--encre-2)}
+.vide p.vide-titre{color:var(--encre)}
+
+.liste{margin-bottom:16px;background:var(--feuille);border-top:2px solid var(--encre)}
+.ligne{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:64px;padding:10px 12px;border:0;border-bottom:1px solid var(--filet);background:none;text-align:left}
+.ligne-nom{display:block;font:600 1.1875rem/1.2 var(--titre)}
+.ligne-meta{display:block;font-size:.875rem;color:var(--encre-2)}
+.ligne-droite{flex:none;text-align:right}
+.ligne-note{display:block;font:600 1.25rem/1.1 var(--titre)}
+
+.avis{display:inline-block;padding:1px 7px;border:1px solid currentColor;border-radius:2px;font:600 .8125rem var(--titre)}
+.avis.retenir{color:var(--ok)}
+.avis.creuser{color:var(--encre-2)}
+.avis.ecarter{color:var(--rebut)}
+
+.outils{margin-top:28px;padding-top:16px;border-top:1px solid var(--filet)}
+.outils h2{margin:0 0 2px;font:600 1.0625rem var(--titre)}
+.outils p{margin:0 0 4px;font-size:.875rem;color:var(--encre-2)}
+.outils select{min-height:48px;margin-top:8px;padding:8px 10px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille)}
+
+/* Le cartouche : le bloc titre d'un plan technique */
+.cartouche{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--encre);background:var(--feuille)}
+.case{display:flex;flex-direction:column;padding:6px 10px 8px;border-bottom:1px solid var(--encre)}
+.case.pleine{grid-column:1/-1}
+.case.gauche{border-right:1px solid var(--encre)}
+.case.derniere{border-bottom:0}
+.case label{font:500 .8125rem var(--titre);color:var(--encre-2)}
+.case input{width:100%;min-height:32px;padding:2px 0;border:0;border-radius:0;background:transparent;outline:none}
+.case.nom input{font:600 1.5rem/1.2 var(--titre)}
+.case:focus-within{box-shadow:inset 0 0 0 3px var(--repere)}
+
+.astuce{margin:12px 0 0;font-size:.875rem;color:var(--encre-2)}
+
+.bloc{padding:18px 0;border-bottom:1px solid var(--filet)}
+.bloc-tete{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px}
+.bloc h2{margin:0;font:600 1.1875rem/1.25 var(--titre)}
+.aide{margin:2px 0 10px;font-size:.875rem;color:var(--encre-2)}
+.bloc-tete + .zone{margin-top:10px}
+
+.jauge{display:flex}
+.jauge button{width:42px;height:42px;padding:0;border:1px solid var(--encre);border-left-width:0;border-radius:0;background:var(--feuille);font:600 1rem var(--titre)}
+.jauge button:first-child{border-left-width:1px}
+.jauge button.plein{background:var(--trait);color:var(--sur-trait)}
+
+.zone{position:relative}
+textarea{display:block;width:100%;min-height:88px;padding:10px 12px;border:1px solid var(--filet);border-radius:2px;background:var(--feuille);resize:vertical}
+.zone.avec-mic textarea{padding-bottom:56px}
+.mic{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 14px 0 10px;border:1px solid var(--encre);border-radius:20px;background:var(--feuille);font:600 .9375rem var(--titre)}
+.mic svg{width:18px;height:18px;display:block}
+.mic.actif{background:var(--repere);border-color:var(--repere);color:#14263A}
+.mic.actif svg{animation:battement 1.2s ease-in-out infinite}
+@keyframes battement{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.mic.actif svg{animation:none}}
+
+.choix{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.choix button{flex:1 1 110px;min-height:48px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille);font:600 1rem var(--titre)}
+.choix button.pris{background:var(--encre);color:var(--calque)}
+
+.barre{position:sticky;bottom:0;display:flex;gap:8px;margin:24px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--calque);border-top:1px solid var(--filet)}
+.barre .btn{flex:1}
+.fin{margin-top:16px}
+
+.tableau{overflow-x:auto;background:var(--feuille);border-top:2px solid var(--encre)}
+table{width:100%;border-collapse:collapse;font-size:.9375rem}
+th,td{padding:10px 8px;border-bottom:1px solid var(--filet);text-align:center;white-space:nowrap}
+th{font:600 .875rem var(--titre);color:var(--encre-2)}
+td:first-child,th:first-child{text-align:left;padding-left:12px}
+td.nom-col{font:600 1.0625rem var(--titre)}
+td.moy{font:600 1.0625rem var(--titre)}
+
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:10;max-width:420px;margin:0 auto;padding:12px 14px;border-radius:2px;background:var(--encre);color:var(--calque);font-size:.9375rem;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.vu{opacity:1}
+.hors{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0}
+
+/* ---------- Ajouts : formulaires, verrou, annulation ---------- */
+.ligne > span:first-child{min-width:0;overflow-wrap:anywhere}
+.case input{min-width:0}
+.formulaire{margin-top:10px}
+.etiquette{display:block;margin-top:10px;font:500 .875rem var(--titre);color:var(--encre-2)}
+.saisie{display:block;width:100%;min-height:48px;margin-top:4px;padding:8px 12px;border:1px solid var(--encre);border-radius:2px;background:var(--feuille)}
+.erreur{min-height:1.4em;margin:8px 0 0;font-size:.875rem;font-weight:600;color:var(--rebut)}
+.btn[disabled]{opacity:.55;cursor:default}
+.lien{border:0;background:none;padding:12px 0;color:var(--trait);font:600 1rem var(--titre);text-decoration:underline}
+.verrou{padding:20px 0 8px}
+.verrou h2{margin:0 0 4px;font:600 1.375rem/1.2 var(--titre)}
+.verrou p{margin:0;color:var(--encre-2)}
+.verrou .btn{margin-top:12px}
+.oubli{margin-top:20px;padding-top:16px;border-top:1px solid var(--filet)}
+.oubli p{font-size:.9375rem}
+.toast{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.toast.action{pointer-events:auto}
+.toast button{flex:none;min-height:36px;padding:4px 12px;border:1px solid var(--calque);border-radius:2px;background:transparent;color:var(--calque);font:600 .9375rem var(--titre)}

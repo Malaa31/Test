@@ -1,8 +1,12 @@
-/* Garde l'app disponible sans réseau. Changer VERSION à chaque mise à jour des fichiers. */
-var VERSION = 'carnet-visites-v1';
+/* Garde l'app disponible sans réseau.
+   Les fichiers sont mis en cache tous ensemble à l'installation, puis servis depuis ce cache :
+   une mise à jour ne s'applique que si tous les fichiers ont pu être téléchargés.
+   Changer VERSION à chaque modification d'un fichier de l'app. */
+var VERSION = 'carnet-visites-v2';
 var FICHIERS = [
   './',
-  './index.html',
+  './app.css',
+  './app.js',
   './manifest.webmanifest',
   './icone-180.png',
   './icone-192.png',
@@ -12,7 +16,9 @@ var FICHIERS = [
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(VERSION)
-      .then(function (c) { return c.addAll(FICHIERS); })
+      .then(function (c) {
+        return c.addAll(FICHIERS.map(function (u) { return new Request(u, { cache: 'reload' }); }));
+      })
       .then(function () { return self.skipWaiting(); })
   );
 });
@@ -34,22 +40,13 @@ self.addEventListener('fetch', function (e) {
   if (new URL(req.url).origin !== self.location.origin) return;
 
   e.respondWith(
-    caches.match(req, { ignoreSearch: true }).then(function (enCache) {
-      var reseau = fetch(req).then(function (rep) {
-        if (rep && rep.ok) {
-          var copie = rep.clone();
-          caches.open(VERSION).then(function (c) { c.put(req, copie); });
+    caches.open(VERSION).then(function (c) {
+      return c.match(req, { ignoreSearch: true }).then(function (enCache) {
+        if (enCache) return enCache;
+        if (req.mode === 'navigate') {
+          return c.match('./').then(function (accueil) { return accueil || fetch(req); });
         }
-        return rep;
-      });
-      if (enCache) {
-        /* Réponse immédiate depuis le cache, mise à jour en arrière-plan. */
-        reseau.catch(function () {});
-        return enCache;
-      }
-      return reseau.catch(function () {
-        if (req.mode === 'navigate') return caches.match('./index.html');
-        return Response.error();
+        return fetch(req);
       });
     })
   );
