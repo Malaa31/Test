@@ -128,3 +128,20 @@ td.moy{font:600 1.0625rem var(--titre)}
 .toast{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .toast.action{pointer-events:auto}
 .toast button{flex:none;min-height:36px;padding:4px 12px;border:1px solid var(--calque);border-radius:2px;background:transparent;color:var(--calque);font:600 .9375rem var(--titre)}
+
+/* ---------- Préparation : sujets à traiter ---------- */
+[hidden]{display:none !important}
+.sous-titre{margin:18px 0 0;font:600 1.0625rem/1.25 var(--titre)}
+.sous-titre + .aide{margin-bottom:8px}
+.bloc select.saisie{margin-bottom:2px}
+.compteur{margin:2px 0 8px;font-size:.875rem;color:var(--encre-2)}
+.sujets{border-top:1px solid var(--filet)}
+.sujet{display:grid;grid-template-columns:44px 1fr 44px;align-items:start;padding:6px 0;border-bottom:1px solid var(--filet);border-left:3px solid transparent}
+.sujet.fait{border-left-color:var(--ok)}
+.coche{width:24px;height:24px;margin:10px 0 0 8px;accent-color:var(--ok)}
+.sujet textarea{min-height:0;border-color:transparent;background:transparent;resize:none;overflow:hidden}
+.sujet .sujet-texte{padding:9px 4px;font-weight:500}
+.sujet .sujet-texte:focus,.sujet .sujet-reponse{border-color:var(--filet);background:var(--feuille)}
+.sujet .sujet-reponse{grid-column:2 / 4;margin:2px 8px 6px 0;width:auto;min-height:56px;padding:8px 10px;font-size:.9375rem}
+.retirer{width:44px;height:44px;border:0;background:none;color:var(--encre-2);font:400 1.5rem/1 var(--texte)}
+.sujets + .rangee{margin-top:12px}

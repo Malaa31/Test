@@ -1,6 +1,8 @@
 # Carnet de visites
 
-Mini app pour rédiger des comptes rendus de visites fournisseurs : une fiche par entreprise, six critères notés de 1 à 5, comparatif et export en texte.
+Mini app pour préparer des visites fournisseurs et en rédiger les comptes rendus : une fiche par rencontre, les sujets à traiter préparés à l'avance et cochés sur place, six critères notés de 1 à 5 pour les fournisseurs, comparatif et export en texte.
+
+Les sujets types proposés par métier (usinage, traitement de surface, traitement thermique, réunion d'équipe, client, FAI) sont génériques. Les noms de sociétés et le contenu des visites ne figurent jamais dans ce dépôt : ils sont saisis ou importés sur l'appareil.
 
 ## Où vont les données
 

@@ -26,6 +26,91 @@ var AVIS=[
   {k:'ecarter',t:'À écarter'}
 ];
 
+/* Types de rencontre et sujets types à préparer.
+   Contenu volontairement générique : aucun nom de société, de programme ou de pièce ici. */
+/*TYPES-DEBUT*/
+var TYPES=[
+  {k:'usinage',t:'Usineur',f:true,s:[
+    'Capacité dédiée à nos pièces : parc machines, taux de charge, créneaux disponibles.',
+    'Montée en cadence : plan, jalons et date réaliste de première pièce bonne.',
+    'FAI (EN 9102) : faites, en cours, écarts ouverts.',
+    'Matière : source, certificats, délais, sources approuvées par le client.',
+    'Procédés spéciaux sous-traités : chez qui, statut de qualification, flux logistique.',
+    'Moyens de contrôle : MMT, programmes, capabilité sur les cotes critiques.',
+    'Non-conformités et dérogations : délai de traitement, exemples récents.',
+    'Configuration : indice des plans utilisé, gestion des évolutions.',
+    'Outillages et programmes CN : propriété, état, validation.',
+    'Équipe projet : interlocuteur unique, niveau d’anglais, rythme des points.',
+    'Emballage et export : protection des pièces, incoterm, délai de transit.'
+  ]},
+  {k:'surface',t:'Traitement de surface',f:true,s:[
+    'Périmètre exact : procédés concernés et spécifications applicables.',
+    'Nadcap traitement chimique : périmètre, échéance, écarts du dernier audit.',
+    'Qualification client, procédé par procédé : acquise, en cours, bloquante.',
+    'Cuves : dimensions utiles, taille maximale des pièces, charge actuelle.',
+    'Suivi des bains : analyses, fréquence, enregistrements, dérives constatées.',
+    'Éprouvettes et essais périodiques : brouillard salin, adhérence, épaisseur.',
+    'Épargnes et outillages d’accrochage : qui les conçoit, délais, validation.',
+    'Flux avec l’usineur : transport, protection, délai maximal avant traitement.',
+    'Traçabilité par lot et certificats de conformité.',
+    'Produits réglementés (chrome VI, REACH) : situation et alternatives.',
+    'Non-conformités : retouches autorisées, décapage, rebut.'
+  ]},
+  {k:'thermique',t:'Traitement thermique',f:true,s:[
+    'Périmètre exact : procédés, alliages et spécifications applicables.',
+    'Nadcap traitement thermique : périmètre, échéance, écarts du dernier audit.',
+    'Qualification client, procédé par procédé : acquise, en cours, bloquante.',
+    'Fours : dimensions utiles, classe, instrumentation.',
+    'Pyrométrie (AMS 2750) : TUS, SAT, étalonnages, dates des derniers relevés.',
+    'Délai de trempe et maîtrise du transfert.',
+    'Essais associés : dureté, conductivité, traction, laboratoire interne ou externe.',
+    'Enregistrements de cycle et traçabilité par charge.',
+    'Capacité, délai de traitement, gestion des urgences.',
+    'Flux avec l’usineur : transport, déformations, redressage.',
+    'Non-conformités : retraitement autorisé ou non, décision et délai.'
+  ]},
+  {k:'autre',t:'Autre fournisseur',f:true,s:[]},
+  {k:'equipe',t:'Réunion d’équipe',f:false,s:[
+    'Avancement par lot de transfert : jalons tenus, en retard, à risque.',
+    'Points bloquants et décisions attendues de ma part.',
+    'Statut des FAI et des qualifications de procédés.',
+    'Risques fournisseurs : capacité, qualité, délais.',
+    'Rôles et interlocuteurs par fournisseur.',
+    'Besoins de l’équipe : ressources, accès, outils, appui depuis la France.',
+    'Fonctionnement : rythme des points, indicateurs, remontée des alertes.',
+    'Plan des quatre prochaines semaines.'
+  ]},
+  {k:'client',t:'Client ou donneur d’ordre',f:false,s:[
+    'Périmètre exact : quels procédés, quels fournisseurs, quelles références.',
+    'Démarche de qualification : étapes, livrables, qui fait quoi.',
+    'Calendrier : dates d’audit, délais de réponse, date cible d’approbation.',
+    'Prérequis côté fournisseur : dossier, éprouvettes, essais, accréditations.',
+    'Approbation fournisseur en cours : statut, écarts restants.',
+    'Points bloquants connus et plan de levée.',
+    'Interlocuteurs et circuit de décision.',
+    'Ce qu’ils attendent de nous, et pour quand.',
+    'Risque planning : plan B si la qualification glisse.'
+  ]},
+  {k:'fai',t:'Prestataire FAI',f:false,s:[
+    'Périmètre : nombre de références par fournisseur, FAI complète ou partielle.',
+    'Référentiel et format : EN 9102, formulaires, exigences client.',
+    'Rôles : qui rédige, qui vérifie, qui approuve.',
+    'Planning FAI aligné sur les dates de premières pièces.',
+    'Données d’entrée : plans et indices, gammes, certificats matière et procédés.',
+    'Écarts : FAI refusée, dérogation, délai de reprise.',
+    'Présence sur site chez les fournisseurs.',
+    'Indicateurs : bon du premier coup, délai moyen, dossiers en attente.',
+    'Outil et archivage des dossiers.',
+    'Charge et ressources affectées.'
+  ]}
+];
+/*TYPES-FIN*/
+var SYNTHESE_REUNION=[
+  {k:'forts',t:'Décisions prises'},
+  {k:'risques',t:'Points ouverts et risques'},
+  {k:'suites',t:'Actions à mener'}
+];
+
 var UA=navigator.userAgent||'';
 var SR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 var ANDROID=/Android/i.test(UA);
@@ -74,8 +159,20 @@ function normaliser(v){
   var avis=texte(v.avis,20);
   if(!libelleAvis(avis)) avis='';
   var cree=horodatage(v.cree,Date.now());
+  var type=texte(v.type,20);
+  if(!typeConnu(type)) type='autre';
+  var vus={}, sujets=[];
+  (Array.isArray(v.sujets)?v.sujets:[]).slice(0,80).forEach(function(x){
+    x=(x&&typeof x==='object')?x:{};
+    var t=texte(x.t,600), note=texte(x.note,5000);
+    if(!t.trim()&&!note.trim()) return;
+    var sid=texte(x.id,40).replace(/[^A-Za-z0-9_-]/g,'');
+    while(!sid||vus[sid]) sid=nouvelId();
+    vus[sid]=true;
+    sujets.push({id:sid,t:t,fait:x.fait===true,note:note});
+  });
   return {
-    id:id,
+    id:id, type:type, objectif:texte(v.objectif,2000), sujets:sujets,
     nom:texte(v.nom,300), ville:texte(v.ville,300), date:date,
     contacts:texte(v.contacts,1000), activite:texte(v.activite,1000),
     libre:texte(v.libre),
@@ -269,7 +366,21 @@ function indexDe(id){
   return -1;
 }
 function trouver(id){ var i=indexDe(id); return i<0?null:etat.visits[i]; }
+function typeConnu(k){
+  for(var i=0;i<TYPES.length;i++) if(TYPES[i].k===k) return TYPES[i];
+  return null;
+}
+function typeDe(v){ return typeConnu(v.type)||typeConnu('autre'); }
+function estFournisseur(v){ return typeDe(v).f; }
+function syntheseDe(v){ return estFournisseur(v)?SYNTHESE:SYNTHESE_REUNION; }
+function sujetsUtiles(v){ return v.sujets.filter(function(s){ return s.t.trim()||s.note.trim(); }); }
+function compteSujets(v){
+  var u=sujetsUtiles(v), faits=u.filter(function(s){ return s.fait; }).length;
+  return u.length?faits+' sur '+u.length+(faits>1?' traités':' traité'):'';
+}
+function fournisseurs(){ return etat.visits.filter(estFournisseur); }
 function moyenne(v){
+  if(!estFournisseur(v)) return null;
   var s=0,n=0;
   CRITERES.forEach(function(c){ var x=Number(v.scores[c.k])||0; if(x>0){ s+=x; n++; } });
   return n?s/n:null;
@@ -294,30 +405,49 @@ function nomOu(v){ return v.nom.trim()||'Visite sans nom'; }
 /* ---------- Comptes rendus ---------- */
 
 function crTexte(v){
-  var L=['Compte rendu de visite',''];
-  L.push('Entreprise : '+(v.nom.trim()||'à compléter'));
+  var four=estFournisseur(v);
+  var L=[four?'Compte rendu de visite':'Compte rendu de réunion',''];
+  L.push((four?'Entreprise : ':'Rencontre : ')+(v.nom.trim()||'à compléter'));
+  if(v.type!=='autre') L.push('Type : '+typeDe(v).t);
   if(v.ville.trim()) L.push('Ville : '+v.ville.trim());
   if(v.date) L.push('Date : '+dateFr(v.date));
   if(v.contacts.trim()) L.push('Interlocuteurs : '+v.contacts.trim());
-  if(v.activite.trim()) L.push('Activité : '+v.activite.trim());
+  if(v.activite.trim()) L.push((four?'Activité : ':'Contexte : ')+v.activite.trim());
   var m=moyenne(v);
   if(m!==null) L.push('Note moyenne : '+nombre(m)+'/5');
-  if(v.avis) L.push('Avis : '+libelleAvis(v.avis));
+  if(four&&v.avis) L.push('Avis : '+libelleAvis(v.avis));
+  if(v.objectif.trim()) L.push('','Objectif',v.objectif.trim());
+  var u=sujetsUtiles(v);
+  var faits=u.filter(function(x){ return x.fait; }), reste=u.filter(function(x){ return !x.fait; });
+  if(faits.length){
+    L.push('','Sujets traités ('+faits.length+' sur '+u.length+')');
+    faits.forEach(function(x){
+      L.push('- '+(x.t.trim()||'Sujet sans titre'));
+      if(x.note.trim()) L.push('  Réponse : '+x.note.trim().replace(/\n/g,'\n  '));
+    });
+  }
+  if(reste.length){
+    L.push('',faits.length?'Sujets non traités':'Sujets à traiter');
+    reste.forEach(function(x){
+      L.push('- '+(x.t.trim()||'Sujet sans titre'));
+      if(x.note.trim()) L.push('  Note : '+x.note.trim().replace(/\n/g,'\n  '));
+    });
+  }
   if(v.libre.trim()) L.push('','Débrief à chaud',v.libre.trim());
-  CRITERES.forEach(function(c){
+  if(four) CRITERES.forEach(function(c){
     var s=Number(v.scores[c.k])||0, n=(v.notes[c.k]||'').trim();
     if(!s&&!n) return;
     L.push('',c.t+(s?' ('+s+'/5)':''));
     if(n) L.push(n);
   });
-  SYNTHESE.forEach(function(c){
+  syntheseDe(v).forEach(function(c){
     var n=(v[c.k]||'').trim();
     if(n) L.push('',c.t,n);
   });
   return L.join('\n');
 }
 function classement(){
-  return parDate(etat.visits).sort(function(a,b){
+  return parDate(fournisseurs()).sort(function(a,b){
     var ma=moyenne(a), mb=moyenne(b);
     if(ma===null&&mb===null) return 0;
     if(ma===null) return 1;
@@ -326,7 +456,8 @@ function classement(){
   });
 }
 function toutTexte(){
-  var L=['Comparatif des visites',''];
+  var L=[];
+  if(fournisseurs().length) L.push('Comparatif des fournisseurs','');
   classement().forEach(function(v,i){
     var m=moyenne(v), bouts=[];
     if(m!==null) bouts.push(nombre(m)+'/5');
@@ -334,7 +465,8 @@ function toutTexte(){
     L.push((i+1)+'. '+nomOu(v)+(v.ville.trim()?' ('+v.ville.trim()+')':'')+(bouts.length?' : '+bouts.join(', '):''));
   });
   parDate(etat.visits).forEach(function(v){
-    L.push('','----------------------------------------','',crTexte(v));
+    if(L.length) L.push('','----------------------------------------','');
+    L.push(crTexte(v));
   });
   return L.join('\n');
 }
@@ -777,11 +909,13 @@ function vueListe(){
     var liste=h('div',{class:'liste'});
     parDate(etat.visits).forEach(function(v){
       var m=moyenne(v);
-      var meta=[v.ville.trim(),dateFr(v.date)].filter(Boolean).join(', ');
+      var meta=[v.type!=='autre'?typeDe(v).t:'',v.ville.trim(),dateFr(v.date)].filter(Boolean).join(', ');
+      var sujets=compteSujets(v);
       liste.appendChild(h('button',{type:'button',class:'ligne',onclick:function(){ aller('visite-'+v.id); }},
         h('span',null,
           h('span',{class:'ligne-nom',text:nomOu(v)}),
-          meta?h('span',{class:'ligne-meta',text:meta}):null),
+          meta?h('span',{class:'ligne-meta',text:meta}):null,
+          sujets?h('span',{class:'ligne-meta',text:'Sujets : '+sujets}):null),
         h('span',{class:'ligne-droite'},
           m!==null?h('span',{class:'ligne-note',text:nombre(m)+'/5'}):null,
           v.avis?h('span',{class:'avis '+v.avis,text:libelleAvis(v.avis)}):null)));
@@ -790,9 +924,9 @@ function vueListe(){
   }
 
   f.appendChild(h('button',{type:'button',class:'btn principal large',onclick:creer},'Nouvelle visite'));
-  if(etat.visits.length>=2){
+  if(fournisseurs().length>=2){
     f.appendChild(h('div',{class:'rangee'},
-      h('button',{type:'button',class:'btn',onclick:function(){ aller('comparer'); }},'Comparer les visites')));
+      h('button',{type:'button',class:'btn',onclick:function(){ aller('comparer'); }},'Comparer les fournisseurs')));
   }
   if(etat.visits.length){
     f.appendChild(h('div',{class:'rangee'},
@@ -808,32 +942,121 @@ function vueListe(){
 
 /* ---------- Vue : une visite ---------- */
 
+function sectionPreparation(v){
+  var compteur=h('p',{class:'compteur','aria-live':'polite'});
+  var liste=h('div',{class:'sujets'});
+  function compter(){ compteur.textContent=compteSujets(v)||'Aucun sujet pour l’instant.'; }
+
+  function ligne(s){
+    var coche=h('input',{type:'checkbox',class:'coche','aria-label':'Sujet traité'});
+    coche.checked=s.fait;
+    var txt=h('textarea',{class:'sujet-texte',rows:1,'aria-label':'Sujet à traiter',placeholder:'Sujet à traiter'});
+    txt.value=s.t;
+    var rep=h('textarea',{class:'sujet-reponse',rows:2,'aria-label':'Réponse obtenue',placeholder:'Réponse obtenue'});
+    rep.value=s.note;
+    var retirer=h('button',{type:'button',class:'retirer','aria-label':'Retirer ce sujet',text:'\u00D7'});
+    var rang=h('div',{class:'sujet'+(s.fait?' fait':'')},coche,txt,retirer,rep);
+    function montrer(){ rep.hidden=!(s.fait||s.note.trim()); if(!rep.hidden) grandir(rep); }
+    coche.addEventListener('change',function(){
+      s.fait=coche.checked; rang.classList.toggle('fait',s.fait);
+      montrer(); compter(); modifie(v);
+    });
+    txt.addEventListener('input',function(){ s.t=txt.value; grandir(txt); compter(); modifie(v); });
+    txt.addEventListener('change',function(){ if(minuteur) sauver(); });
+    rep.addEventListener('input',function(){ s.note=rep.value; grandir(rep); modifie(v); });
+    rep.addEventListener('change',function(){ if(minuteur) sauver(); });
+    retirer.addEventListener('click',function(){
+      var i=v.sujets.indexOf(s);
+      if(i<0) return;
+      v.sujets.splice(i,1); modifie(v); redessiner();
+      if(!s.t.trim()&&!s.note.trim()) return;
+      toast('Sujet retiré','Annuler',function(){
+        if(verrouille||indexDe(v.id)<0||v.sujets.indexOf(s)>=0) return;
+        v.sujets.splice(Math.min(i,v.sujets.length),0,s); modifie(v);
+        if(vue.nom==='visite'&&vue.id===v.id) rendreSurPlace();
+      });
+    });
+    rep.hidden=!(s.fait||s.note.trim());
+    return {rang:rang,txt:txt};
+  }
+  function redessiner(){
+    liste.textContent='';
+    v.sujets.forEach(function(s){ liste.appendChild(ligne(s).rang); });
+    var zones=liste.querySelectorAll('textarea');
+    for(var i=0;i<zones.length;i++) if(!zones[i].hidden) grandir(zones[i]);
+    compter();
+  }
+
+  var choixType=h('select',{id:'c-type',class:'saisie'});
+  TYPES.forEach(function(t){ choixType.appendChild(h('option',{value:t.k,text:t.t})); });
+  choixType.value=v.type;
+  choixType.addEventListener('change',function(){
+    v.type=typeConnu(choixType.value)?choixType.value:'autre';
+    modifie(v); sauver(); rendreSurPlace();
+  });
+
+  var modele=typeDe(v).s;
+  var boutons=h('div',{class:'rangee'},
+    h('button',{type:'button',class:'btn',text:'Ajouter un sujet',onclick:function(){
+      var s={id:nouvelId(),t:'',fait:false,note:''};
+      v.sujets.push(s);
+      var l=ligne(s); liste.appendChild(l.rang); grandir(l.txt); compter();
+      l.txt.focus();
+    }}),
+    modele.length?h('button',{type:'button',class:'btn',text:'Ajouter les sujets types',onclick:function(){
+      var deja={}, n=0;
+      v.sujets.forEach(function(s){ deja[s.t.trim()]=true; });
+      modele.forEach(function(t){
+        if(deja[t]) return;
+        v.sujets.push({id:nouvelId(),t:t,fait:false,note:''}); n++;
+      });
+      if(!n){ toast('Les sujets types sont déjà dans la liste.'); return; }
+      modifie(v); redessiner();
+      toast(n+(n>1?' sujets ajoutés':' sujet ajouté')+' : '+typeDe(v).t);
+    }}):null);
+
+  var sec=h('section',{class:'bloc'},
+    h('h2',{text:'Préparation'}),
+    h('p',{class:'aide',text:'À remplir avant d’y aller. Sur place, coche chaque sujet traité et note la réponse.'}),
+    h('label',{class:'etiquette',for:'c-type',text:'Type de rencontre'}),choixType,
+    h('h3',{class:'sous-titre',text:'Objectif'}),
+    h('p',{class:'aide',text:'Ce que tu veux avoir obtenu en repartant.'}),
+    zone(v,v,'objectif','Objectif','z-objectif',2),
+    h('h3',{class:'sous-titre',text:'Sujets à traiter'}),
+    compteur,liste,boutons);
+  redessiner();
+  return sec;
+}
+
 function vueVisite(v){
+  var four=estFournisseur(v);
   var f=document.createDocumentFragment();
   f.appendChild(h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},'Toutes les visites'));
 
   f.appendChild(h('div',{class:'cartouche'},
-    caseCartouche(v,'nom','Entreprise','pleine nom','text','Nom de l’entreprise'),
+    caseCartouche(v,'nom',four?'Entreprise':'Rencontre','pleine nom','text',four?'Nom de l’entreprise':'Avec qui'),
     caseCartouche(v,'ville','Ville','gauche','text'),
     caseCartouche(v,'date','Date','','date'),
     caseCartouche(v,'contacts','Interlocuteurs','pleine','text','Noms et fonctions'),
-    caseCartouche(v,'activite','Activité','pleine derniere','text','Métier, pièces, clients')));
+    caseCartouche(v,'activite',four?'Activité':'Contexte','pleine derniere','text',four?'Métier, pièces, clients':'Projet, périmètre')));
 
   if(!(SR&&etat.dictee)) f.appendChild(h('p',{class:'astuce',text:'Pour dicter, touche un champ puis le micro de ton clavier.'}));
 
+  f.appendChild(sectionPreparation(v));
+
   f.appendChild(h('section',{class:'bloc'},
     h('h2',{text:'Débrief à chaud'}),
-    h('p',{class:'aide',text:'Note tout ce qui te vient en sortant du site. Tu trieras ensuite.'}),
+    h('p',{class:'aide',text:four?'Note tout ce qui te vient en sortant du site. Tu trieras ensuite.':'Note tout ce qui te vient en sortant de la réunion. Tu trieras ensuite.'}),
     zone(v,v,'libre','Débrief à chaud','z-libre',5)));
 
-  CRITERES.forEach(function(c){
+  if(four) CRITERES.forEach(function(c){
     f.appendChild(h('section',{class:'bloc'},
       h('div',{class:'bloc-tete'},h('h2',{text:c.t}),jauge(v,c)),
       h('p',{class:'aide',text:c.a}),
       zone(v,v.notes,c.k,c.t,'z-'+c.k,3)));
   });
 
-  SYNTHESE.forEach(function(c){
+  syntheseDe(v).forEach(function(c){
     f.appendChild(h('section',{class:'bloc'},
       h('div',{class:'bloc-tete'},h('h2',{text:c.t})),
       zone(v,v,c.k,c.t,'z-'+c.k,3)));
@@ -854,7 +1077,7 @@ function vueVisite(v){
     boutons.push(b); choix.appendChild(b);
   });
   peindre();
-  f.appendChild(h('section',{class:'bloc'},h('h2',{text:'Avis'}),choix));
+  if(four) f.appendChild(h('section',{class:'bloc'},h('h2',{text:'Avis'}),choix));
 
   var suppr=deuxTemps(h('button',{type:'button',class:'btn danger',text:'Supprimer la visite'}),
     'Supprimer la visite','Confirmer la suppression',function(){ supprimer(v); });
@@ -892,7 +1115,7 @@ function vueComparer(){
     corps.appendChild(tr);
   });
   f.appendChild(h('div',{class:'tableau'},h('table',null,h('thead',null,tete),corps)));
-  f.appendChild(h('p',{class:'astuce',text:'Classées par note moyenne. Les notes vont de 1 à 5.'}));
+  f.appendChild(h('p',{class:'astuce',text:'Fournisseurs classés par note moyenne. Les notes vont de 1 à 5.'}));
   f.appendChild(h('div',{class:'rangee'},
     h('button',{type:'button',class:'btn',onclick:function(){ copier(toutTexte(),'Tous les CR copiés'); }},'Copier tous les CR')));
   return f;
@@ -961,7 +1184,7 @@ function lireCopie(input){
 /* ---------- Navigation ---------- */
 
 function routeDepuis(r){
-  if(r==='comparer'&&etat.visits.length) return {nom:'comparer',id:null};
+  if(r==='comparer'&&fournisseurs().length) return {nom:'comparer',id:null};
   if(r.indexOf('visite-')===0&&trouver(r.slice(7))) return {nom:'visite',id:r.slice(7)};
   return {nom:'liste',id:null};
 }
@@ -972,11 +1195,16 @@ function rendre(){
   var v=(vue.nom==='visite')?trouver(vue.id):null;
   if(verrouille) cible.appendChild(vueVerrou());
   else if(v) cible.appendChild(vueVisite(v));
-  else if(vue.nom==='comparer'&&etat.visits.length) cible.appendChild(vueComparer());
+  else if(vue.nom==='comparer'&&fournisseurs().length) cible.appendChild(vueComparer());
   else cible.appendChild(vueListe());
   var zones=cible.querySelectorAll('textarea');
-  for(var i=0;i<zones.length;i++) grandir(zones[i]);
+  for(var i=0;i<zones.length;i++) if(!zones[i].hidden) grandir(zones[i]);
   afficherEtat();
+}
+function rendreSurPlace(){
+  var y=window.pageYOffset;
+  rendre();
+  window.scrollTo(0,y);
 }
 function reafficher(){
   vue=routeDepuis((location.hash||'').slice(1));
