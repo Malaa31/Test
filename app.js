@@ -589,6 +589,19 @@ function deuxTemps(btn,libelle,confirmer,action){
   });
   return btn;
 }
+/* En haut de chaque écran secondaire, et qui reste visible en défilant. */
+function boutonRetour(){
+  var NS='http://www.w3.org/2000/svg';
+  var svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('viewBox','0 0 24 24'); svg.setAttribute('fill','none');
+  svg.setAttribute('stroke','currentColor'); svg.setAttribute('stroke-width','2.5');
+  svg.setAttribute('stroke-linecap','round'); svg.setAttribute('stroke-linejoin','round');
+  svg.setAttribute('aria-hidden','true');
+  var p=document.createElementNS(NS,'path'); p.setAttribute('d','M15 5l-7 7 7 7');
+  svg.appendChild(p);
+  return h('div',{class:'haut'},
+    h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},svg,'Retour'));
+}
 function champCode(id,libelle,remplissage){
   return [
     h('label',{class:'etiquette',for:id,text:libelle}),
@@ -1031,7 +1044,7 @@ function sectionPreparation(v){
 function vueVisite(v){
   var four=estFournisseur(v);
   var f=document.createDocumentFragment();
-  f.appendChild(h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},'Toutes les visites'));
+  f.appendChild(boutonRetour());
 
   f.appendChild(h('div',{class:'cartouche'},
     caseCartouche(v,'nom',four?'Entreprise':'Rencontre','pleine nom','text',four?'Nom de l’entreprise':'Avec qui'),
@@ -1099,7 +1112,7 @@ function vueVisite(v){
 
 function vueComparer(){
   var f=document.createDocumentFragment();
-  f.appendChild(h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},'Toutes les visites'));
+  f.appendChild(boutonRetour());
   var tete=h('tr',null,h('th',{scope:'col',text:'Entreprise'}),h('th',{scope:'col',text:'Moyenne'}));
   CRITERES.forEach(function(c){ tete.appendChild(h('th',{scope:'col',text:c.c})); });
   tete.appendChild(h('th',{scope:'col',text:'Avis'}));
