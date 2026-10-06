@@ -1082,14 +1082,16 @@ function vueVisite(v){
   var suppr=deuxTemps(h('button',{type:'button',class:'btn danger',text:'Supprimer la visite'}),
     'Supprimer la visite','Confirmer la suppression',function(){ supprimer(v); });
   f.appendChild(h('div',{class:'rangee fin'},
+    navigator.share?h('button',{type:'button',class:'btn',onclick:function(){
+      navigator.share({title:'CR '+nomOu(v),text:crTexte(v)}).catch(function(){});
+    }},'Partager le CR'):null,
     h('button',{type:'button',class:'btn',onclick:function(){ enregistrerTexte(nomFichier(v),crTexte(v)); }},'Télécharger le CR'),
     suppr));
 
+  /* Toujours visible en bas : valider enregistre et ramène à la liste. */
   f.appendChild(h('div',{class:'barre'},
-    h('button',{type:'button',class:'btn principal',onclick:function(){ copier(crTexte(v),'CR copié'); }},'Copier le CR'),
-    navigator.share?h('button',{type:'button',class:'btn',onclick:function(){
-      navigator.share({title:'CR '+nomOu(v),text:crTexte(v)}).catch(function(){});
-    }},'Partager le CR'):null));
+    h('button',{type:'button',class:'btn principal',onclick:function(){ valider(); }},'Valider'),
+    h('button',{type:'button',class:'btn',onclick:function(){ copier(crTexte(v),'CR copié'); }},'Copier le CR')));
   return f;
 }
 
@@ -1128,6 +1130,15 @@ function creer(){
   etat.visits.push(v);
   sauver();
   aller('visite-'+v.id);
+}
+function valider(){
+  arreterDictee();
+  sauver();
+  file.then(function(){
+    if(!stockageOK){ toast('Enregistrement impossible sur cet appareil. Copie ton CR avant de quitter la fiche.'); return; }
+    aller('');
+    toast('Visite enregistrée. Touche-la dans la liste pour la modifier.');
+  });
 }
 function supprimer(v){
   var i=indexDe(v.id);
