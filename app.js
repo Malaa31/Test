@@ -240,7 +240,8 @@ function tableValide(o){
   return n?t:null;
 }
 /* Notes à ajouter à des fiches existantes, fournies par un fichier importé : validées avant usage.
-   "champs" : texte ajouté à la suite d'une rubrique. "siVide" : valeur posée seulement si la case est vide. */
+   "champs" : texte ajouté à la suite d'une rubrique. "siVide" : valeur posée seulement si la case est vide.
+   "retirer" : lignes à enlever d'une rubrique, seulement si elles s'y trouvent mot pour mot. */
 var RUBRIQUES_TEXTE=['libre','forts','risques','suites'];
 function estCritere(k){
   for(var i=0;i<CRITERES.length;i++) if(CRITERES[i].k===k) return true;
@@ -259,6 +260,13 @@ function ajoutsValides(a){
       if(k==='libre'&&!t) t=texte(x.texte,20000).trim();          /* ancien format : tout dans le débrief */
       if(t){ champs[k]=t; n++; }
     });
+    var rt=(x.retirer&&typeof x.retirer==='object'&&!Array.isArray(x.retirer))?x.retirer:{}, retirer={};
+    RUBRIQUES_TEXTE.concat(CRITERES.map(function(c){ return c.k; })).forEach(function(k){
+      if(!possede(rt,k)||!Array.isArray(rt[k])) return;
+      var lignes=[];
+      rt[k].slice(0,60).forEach(function(l){ l=texte(l,600).trim(); if(l) lignes.push(l); });
+      if(lignes.length){ retirer[k]=lignes; n++; }
+    });
     var sv=(x.siVide&&typeof x.siVide==='object'&&!Array.isArray(x.siVide))?x.siVide:{}, siVide={};
     ['ville','contacts','activite','objectif'].forEach(function(k){
       var t=possede(sv,k)?texte(sv[k],1000).trim():'';
@@ -269,7 +277,7 @@ function ajoutsValides(a){
     var type=texte(possede(sv,'type')?sv.type:x.type,20);
     if(typeConnu(type)&&type!=='autre'){ siVide.type=type; n++; }
     if(!n||(!id&&!nom)) return;
-    out.push({id:id,nom:nom,champs:champs,siVide:siVide});
+    out.push({id:id,nom:nom,champs:champs,siVide:siVide,retirer:retirer});
   });
   return out.length?out:null;
 }
@@ -2018,6 +2026,13 @@ function appliquerAjouts(ajouts){
       return;
     }
     var change=false;
+    for(k in a.retirer){
+      if(!possede(a.retirer,k)) continue;
+      var ou=estCritere(k)?v.notes:v, avant=ou[k]||'', exclues=a.retirer[k];
+      var gardees=avant.split('\n').filter(function(l){ return exclues.indexOf(l.trim())<0; });
+      var apres=gardees.join('\n').replace(/\n{3,}/g,'\n\n').replace(/^\n+/,'').replace(/\s+$/,'');
+      if(gardees.length!==avant.split('\n').length){ ou[k]=apres; change=true; }
+    }
     for(k in a.champs){
       if(!possede(a.champs,k)) continue;
       var cible=estCritere(k)?v.notes:v, actuel=cible[k]||'', t=a.champs[k];
@@ -2050,12 +2065,12 @@ function fusionner(liste,table,ajouts){
   if(ajouts){
     var p=[];
     if(ajout) p.push(ajout+(ajout>1?' visits restored':' visit restored'));
-    if(notes.ajoutes) p.push('notes added to '+pluriel(notes.ajoutes,'visit','visits'));
+    if(notes.ajoutes) p.push(pluriel(notes.ajoutes,'visit','visits')+' updated');
     if(notes.creees) p.push(pluriel(notes.creees,'new visit','new visits')+' created');
-    if(notes.deja) p.push(pluriel(notes.deja,'visit','visits')+' already had these notes');
+    if(notes.deja) p.push(pluriel(notes.deja,'visit','visits')+' already up to date');
     if(suite) p.push(suite);
     var m=p.join(', ');
-    toast(m?m.charAt(0).toUpperCase()+m.slice(1)+'. Nothing was replaced.':'There was nothing to add.');
+    toast(m?m.charAt(0).toUpperCase()+m.slice(1)+'. Nothing you wrote was replaced.':'There was nothing to add.');
     return;
   }
   if(!ajout&&traduits) toast(suite+'.');
