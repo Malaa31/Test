@@ -105,6 +105,23 @@ var TYPES=[
   ]}
 ];
 /*TYPES-FIN*/
+/* Où en est le transfert chez ce fournisseur, avec les sujets propres à chaque cas. */
+var STATUTS=[
+  {k:'encours',t:'Transfer in progress',s:[
+    'Transfer plan: where we stand against the milestones, what is late and why.',
+    'Top three risks on the transfer, and who owns each.',
+    'Support they need from us to hold the dates.'
+  ]},
+  {k:'potentiel',t:'Potential transfer',s:[
+    'Interest in taking on new work packages, and for which part families.',
+    'Comparable parts already produced: references, customers, volumes.',
+    'Free capacity today and investment plans for the next two years.',
+    'Customer approvals and accreditations already held, and their scope.',
+    'Commercial basics: pricing logic, minimum order quantities, payment terms.',
+    'Export control, IP protection and data security practices.',
+    'Financial health and dependence on a single customer.'
+  ]}
+];
 /* Textes français des versions précédentes -> anglais. Sert à convertir les fiches déjà enregistrées. */
 var ANCIENS_TEXTES={
   "Capacité dédiée à nos pièces : parc machines, taux de charge, créneaux disponibles.":"Capacity dedicated to our parts: machine park, load rate, available slots.",
@@ -190,12 +207,15 @@ var verrouille=false;                       /* notes chiffrées, code pas encore
 var stockageOK=true, derniereSauvegarde=null, minuteur=null, horsLigne=false;
 var file=Promise.resolve(), attente=0;      /* écritures chiffrées, dans l'ordre */
 var copieEnAttente=null;                    /* copie de secours chiffrée à ouvrir */
-var panneau='';                             /* '', 'code' ou 'changer' */
+var panneau='';                             /* '', 'code', 'changer' ou 'envoi' */
+var reponsesEnAttente=[];                   /* fichiers de réponses chiffrés à ouvrir */
+var codeEquipe='';                          /* gardé en mémoire le temps de la session */
+var filtreStatut='';
 var oubli=false;
 var cacheLe=0;
 var vue={nom:'liste',id:null};
 
-function etatVide(){ return {visits:[],lang:'fr-FR',dictee:false}; }
+function etatVide(){ return {visits:[],lang:'fr-FR',dictee:false,auteur:'',appareil:'',board:[]}; }
 
 /* ---------- Validation des données ---------- */
 
@@ -242,6 +262,8 @@ function normaliser(v){
   var cree=horodatage(v.cree,Date.now());
   var type=texte(v.type,20);
   if(!typeConnu(type)) type='autre';
+  var statut=texte(v.statut,20);
+  if(!statutConnu(statut)||!typeConnu(type).f) statut='';
   var vus={}, sujets=[];
   (Array.isArray(v.sujets)?v.sujets:[]).slice(0,80).forEach(function(x){
     x=(x&&typeof x==='object')?x:{};
@@ -253,7 +275,7 @@ function normaliser(v){
     sujets.push({id:sid,t:t,fait:x.fait===true,note:note});
   });
   return {
-    id:id, type:type, objectif:texte(v.objectif,2000), sujets:sujets,
+    id:id, type:type, statut:statut, objectif:texte(v.objectif,2000), sujets:sujets,
     nom:texte(v.nom,300), ville:texte(v.ville,300), date:date,
     contacts:texte(v.contacts,1000), activite:ancienTexte(texte(v.activite,1000)),
     libre:texte(v.libre),
@@ -270,7 +292,14 @@ function normaliserEtat(o){
     while(vus[v.id]) v.id=nouvelId();
     vus[v.id]=true; visits.push(v);
   });
-  return {visits:visits, lang:LANGUES.indexOf(o.lang)>=0?o.lang:'fr-FR', dictee:o.dictee===true};
+  var appareils=Object.create(null), board=[];
+  (Array.isArray(o.board)?o.board:[]).slice(0,40).forEach(function(x){
+    var r=normaliserReponse(x);
+    if(appareils[r.appareil]) return;
+    appareils[r.appareil]=true; board.push(r);
+  });
+  return {visits:visits, lang:LANGUES.indexOf(o.lang)>=0?o.lang:'fr-FR', dictee:o.dictee===true,
+    auteur:texte(o.auteur,60), appareil:texte(o.appareil,40).replace(/[^A-Za-z0-9_-]/g,''), board:board};
 }
 
 /* ---------- Chiffrement ---------- */
@@ -330,8 +359,8 @@ function interpreter(s){
   var o;
   try{ o=JSON.parse(String(s).replace(/^\uFEFF/,'')); }catch(e){ return {type:'illisible'}; }
   if(!o||typeof o!=='object'||Array.isArray(o)) return {type:'illisible'};
-  if(o.chiffre===true) return enveloppeValide(o)?{type:'chiffre',env:o}:{type:'illisible'};
-  if(Array.isArray(o.visits)) return {type:'clair',etat:normaliserEtat(o),table:tableValide(o.traductions)};
+  if(o.chiffre===true) return enveloppeValide(o)?{type:'chiffre',env:o,reponse:o.genre==='reponse'}:{type:'illisible'};
+  if(Array.isArray(o.visits)) return {type:'clair',etat:normaliserEtat(o),table:tableValide(o.traductions),reponse:!!o.reponse};
   return {type:'illisible'};
 }
 function sauver(){
@@ -432,6 +461,7 @@ function verrouiller(){
   sauver();                 /* les écritures en file gardent leur clé */
   cle=null; sel=null; verrouille=true;
   etat=etatVide(); copieEnAttente=null; panneau=''; oubli=false;
+  reponsesEnAttente=[]; codeEquipe='';
   rendre(); window.scrollTo(0,0);
 }
 
@@ -491,6 +521,7 @@ function crTexte(v){
   var L=[four?'Visit report':'Meeting report',''];
   L.push((four?'Company: ':'Meeting: ')+(v.nom.trim()||'to be completed'));
   if(v.type!=='autre') L.push('Type: '+typeDe(v).t);
+  if(v.statut) L.push('Transfer status: '+libelleStatut(v.statut));
   if(v.ville.trim()) L.push('City: '+v.ville.trim());
   if(v.date) L.push('Date: '+dateFr(v.date));
   if(v.contacts.trim()) L.push('Contacts: '+v.contacts.trim());
@@ -672,7 +703,7 @@ function deuxTemps(btn,libelle,confirmer,action){
   return btn;
 }
 /* En haut de chaque écran secondaire, et qui reste visible en défilant. */
-function boutonRetour(){
+function boutonRetour(route){
   var NS='http://www.w3.org/2000/svg';
   var svg=document.createElementNS(NS,'svg');
   svg.setAttribute('viewBox','0 0 24 24'); svg.setAttribute('fill','none');
@@ -682,7 +713,7 @@ function boutonRetour(){
   var p=document.createElementNS(NS,'path'); p.setAttribute('d','M15 5l-7 7 7 7');
   svg.appendChild(p);
   return h('div',{class:'haut'},
-    h('button',{type:'button',class:'retour',onclick:function(){ aller(''); }},svg,'Back'));
+    h('button',{type:'button',class:'retour',onclick:function(){ aller(route||''); }},svg,'Back'));
 }
 function champCode(id,libelle,remplissage){
   return [
@@ -1004,7 +1035,7 @@ function vueListe(){
     var liste=h('div',{class:'liste'});
     parDate(etat.visits).forEach(function(v){
       var m=moyenne(v);
-      var meta=[v.type!=='autre'?typeDe(v).t:'',v.ville.trim(),dateFr(v.date)].filter(Boolean).join(', ');
+      var meta=[v.type!=='autre'?typeDe(v).t:'',libelleStatut(v.statut),v.ville.trim(),dateFr(v.date)].filter(Boolean).join(', ');
       var sujets=compteSujets(v);
       liste.appendChild(h('button',{type:'button',class:'ligne',onclick:function(){ aller('visite-'+v.id); }},
         h('span',null,
@@ -1029,6 +1060,7 @@ function vueListe(){
       h('button',{type:'button',class:'btn',onclick:function(){ enregistrerTexte('visit-reports-'+aujourdhui()+'.txt',toutTexte()); }},'Download all reports')));
   }
 
+  f.appendChild(sectionBoard());
   f.appendChild(sectionCopie());
   f.appendChild(sectionVerrou());
   f.appendChild(sectionDictee());
@@ -1087,10 +1119,19 @@ function sectionPreparation(v){
   choixType.value=v.type;
   choixType.addEventListener('change',function(){
     v.type=typeConnu(choixType.value)?choixType.value:'autre';
+    if(!estFournisseur(v)) v.statut='';
     modifie(v); sauver(); rendreSurPlace();
   });
 
-  var modele=typeDe(v).s;
+  var choixStatut=h('select',{id:'c-statut',class:'saisie'},h('option',{value:'',text:'Not specified'}));
+  STATUTS.forEach(function(t){ choixStatut.appendChild(h('option',{value:t.k,text:t.t})); });
+  choixStatut.value=v.statut;
+  choixStatut.addEventListener('change',function(){
+    v.statut=statutConnu(choixStatut.value)?choixStatut.value:'';
+    modifie(v); sauver(); rendreSurPlace();
+  });
+
+  var modele=typeDe(v).s.concat(statutConnu(v.statut)?statutConnu(v.statut).s:[]);
   var boutons=h('div',{class:'rangee'},
     h('button',{type:'button',class:'btn',text:'Add a topic',onclick:function(){
       var s={id:nouvelId(),t:'',fait:false,note:''};
@@ -1107,13 +1148,14 @@ function sectionPreparation(v){
       });
       if(!n){ toast('The standard topics are already in the list.'); return; }
       modifie(v); redessiner();
-      toast(n+(n>1?' topics added':' topic added')+' : '+typeDe(v).t);
+      toast(n+(n>1?' topics added':' topic added')+': '+[typeDe(v).t,libelleStatut(v.statut)].filter(Boolean).join(', '));
     }}):null);
 
   var sec=h('section',{class:'bloc'},
     h('h2',{text:'Preparation'}),
     h('p',{class:'aide',text:'Fill this in before you go. On site, tick each topic covered and note the answer.'}),
     h('label',{class:'etiquette',for:'c-type',text:'Meeting type'}),choixType,
+    estFournisseur(v)?[h('label',{class:'etiquette',for:'c-statut',text:'Transfer status'}),choixStatut]:null,
     h('h3',{class:'sous-titre',text:'Objective'}),
     h('p',{class:'aide',text:'What you want to have obtained by the time you leave.'}),
     zone(v,v,'objectif','Objective','z-objectif',2),
@@ -1218,6 +1260,655 @@ function vueComparer(){
   return f;
 }
 
+/* ---------- Board d'équipe : les réponses de tous, regroupées sur cet appareil ---------- */
+
+function cleNom(s){
+  return String(s).trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+function statutConnu(k){
+  for(var i=0;i<STATUTS.length;i++) if(STATUTS[i].k===k) return STATUTS[i];
+  return null;
+}
+function libelleStatut(k){ var s=statutConnu(k); return s?s.t:''; }
+function plusFrequent(liste){
+  var c=Object.create(null), mieux='', n=0;
+  liste.forEach(function(x){
+    if(!x) return;
+    c[x]=(c[x]||0)+1;
+    if(c[x]>n){ n=c[x]; mieux=x; }
+  });
+  return mieux;
+}
+function dateCourte(ms){
+  var d=new Date(ms);
+  if(!ms||isNaN(d.getTime())) return '';
+  return dateFr(d.getFullYear()+'-'+deux(d.getMonth()+1)+'-'+deux(d.getDate()));
+}
+function pluriel(n,un,plusieurs){ return n+' '+(n===1?un:plusieurs); }
+
+/* Une réponse reçue d'un collègue : tout est revalidé, rien n'est repris tel quel. */
+function normaliserReponse(o){
+  o=(o&&typeof o==='object'&&!Array.isArray(o))?o:{};
+  var vus=Object.create(null), visits=[];
+  (Array.isArray(o.visits)?o.visits:[]).slice(0,200).forEach(function(x){
+    var v=normaliser(x);
+    while(vus[v.id]) v.id=nouvelId();
+    vus[v.id]=true; visits.push(v);
+  });
+  return {
+    auteur:texte(o.auteur,60).trim()||'Unnamed',
+    appareil:texte(o.appareil,40).replace(/[^A-Za-z0-9_-]/g,'')||nouvelId(),
+    envoye:horodatage(o.envoye,Date.now()),
+    visits:visits
+  };
+}
+function aRepondu(v){
+  if(v.avis||v.libre.trim()||v.forts.trim()||v.risques.trim()||v.suites.trim()) return true;
+  for(var i=0;i<CRITERES.length;i++){
+    if((Number(v.scores[CRITERES[i].k])||0)>0||(v.notes[CRITERES[i].k]||'').trim()) return true;
+  }
+  return v.sujets.some(function(s){ return s.fait||s.note.trim(); });
+}
+function repondants(){
+  var nom=etat.auteur.trim();
+  var moi={moi:true,auteur:nom?nom+' (you)':'You',appareil:'',envoye:0,visits:etat.visits};
+  return [moi].concat(etat.board);
+}
+
+/* Regroupe les fiches de tous par société : même fiche importée, ou même nom. */
+function groupes(){
+  var liste=[], parId=Object.create(null), parNom=Object.create(null), cles=Object.create(null);
+  repondants().forEach(function(r){
+    r.visits.forEach(function(v){
+      var n=cleNom(v.nom);
+      var g=parId[v.id]||(n?parNom[n]:null);
+      if(!g){
+        if(!n) return;                                   /* fiche sans nom : rien à regrouper */
+        g={cle:'',nom:v.nom.trim(),entrees:[]}; liste.push(g);
+      }
+      parId[v.id]=g; if(n) parNom[n]=g;
+      g.entrees.push({r:r,v:v,vide:!aRepondu(v)});
+    });
+  });
+  liste.forEach(function(g){
+    g.type=typeConnu(plusFrequent(g.entrees.map(function(e){ return e.v.type; })))||typeConnu('autre');
+    g.four=g.type.f;
+    g.statut=g.four?plusFrequent(g.entrees.map(function(e){ return e.v.statut; })):'';
+    var base=cleNom(g.nom).replace(/ /g,'-')||'x', k=base, i=2;
+    while(cles[k]) k=base+'-'+(i++);
+    cles[k]=true; g.cle=k;
+    calculer(g);
+  });
+  return liste;
+}
+function calculer(g){
+  var moyennes=[], parCritere={}, avis={retenir:0,creuser:0,ecarter:0,aucun:0};
+  CRITERES.forEach(function(c){ parCritere[c.k]={s:0,n:0}; });
+  g.reps=g.entrees.filter(function(e){ return !e.vide; });
+  g.reps.forEach(function(e){
+    var s=0,n=0;
+    CRITERES.forEach(function(c){
+      var x=Number(e.v.scores[c.k])||0;
+      if(x>0){ s+=x; n++; parCritere[c.k].s+=x; parCritere[c.k].n++; }
+    });
+    e.moy=(g.four&&n)?s/n:null;
+    if(e.moy!==null) moyennes.push(e.moy);
+    if(e.v.avis&&possede(avis,e.v.avis)) avis[e.v.avis]++; else avis.aucun++;
+  });
+  g.moy=moyennes.length?moyennes.reduce(function(a,b){ return a+b; },0)/moyennes.length:null;
+  g.min=moyennes.length?Math.min.apply(null,moyennes):null;
+  g.max=moyennes.length?Math.max.apply(null,moyennes):null;
+  g.notes=moyennes.length;
+  g.criteres={};
+  CRITERES.forEach(function(c){ var p=parCritere[c.k]; g.criteres[c.k]=p.n?p.s/p.n:null; });
+  g.avis=avis;
+  g.sujets=sujetsGroupe(g);
+  g.couverts=g.sujets.filter(function(s){ return s.faits>0; }).length;
+}
+/* Les sujets de chacun, réunis : même sujet d'une fiche importée, ou même texte. */
+function sujetsGroupe(g){
+  var liste=[], parId=Object.create(null), parTexte=Object.create(null);
+  g.entrees.forEach(function(e){
+    sujetsUtiles(e.v).forEach(function(s){
+      var kt=cleNom(s.t), ki=e.v.id+'/'+s.id;
+      var x=parId[ki]||(kt?parTexte[kt]:null);
+      if(!x){ x={t:s.t.trim()||'Untitled topic',faits:0,reponses:[]}; liste.push(x); }
+      parId[ki]=x; if(kt) parTexte[kt]=x;
+      if(e.vide) return;                                 /* sujet préparé, fiche jamais remplie */
+      x.reponses.push({auteur:e.r.auteur,fait:s.fait,note:s.note.trim()});
+      if(s.fait) x.faits++;
+    });
+  });
+  return liste;
+}
+function parNote(liste){
+  return liste.slice().sort(function(a,b){
+    if(a.moy===null&&b.moy===null) return a.nom<b.nom?-1:1;
+    if(a.moy===null) return 1;
+    if(b.moy===null) return -1;
+    return (b.moy-a.moy)||(a.nom<b.nom?-1:1);
+  });
+}
+function resumeAvis(a){
+  var bouts=[];
+  if(a.retenir) bouts.push(a.retenir+' retain');
+  if(a.creuser) bouts.push(a.creuser+' investigate');
+  if(a.ecarter) bouts.push(a.ecarter+' rule out');
+  if(a.aucun) bouts.push(a.aucun+' no verdict');
+  return bouts.join(', ');
+}
+
+/* ----- Envoyer ses réponses ----- */
+
+function slug(s){ return cleNom(s).replace(/ /g,'-').slice(0,40)||'me'; }
+function fichierReponses(nom,code){
+  if(!etat.appareil) etat.appareil=nouvelId()+Math.random().toString(36).slice(2,8);
+  etat.auteur=nom;
+  sauver();
+  var contenu=JSON.stringify({app:'carnet-visites',reponse:1,auteur:nom,appareil:etat.appareil,
+    envoye:Date.now(),visits:etat.visits});
+  var fichier='answers-'+slug(nom)+'-'+aujourdhui()+'.json';
+  if(!code) return Promise.resolve({nom:fichier,contenu:contenu});
+  var s=crypto.getRandomValues(new Uint8Array(16));
+  return deriver(code,s,ITERATIONS).then(function(k){ return chiffrer(contenu,k,s,ITERATIONS); })
+    .then(function(env){
+      var o=JSON.parse(env); o.genre='reponse';
+      return {nom:fichier,contenu:JSON.stringify(o)};
+    });
+}
+function partager(nom,contenu){
+  /* La feuille de partage laisse choisir le destinataire. Certains téléphones ne partagent pas
+     les .json : le même contenu part alors en .txt. À défaut, le fichier est téléchargé. */
+  var essais=[{nom:nom,type:'application/json'},{nom:nom.replace(/\.json$/,'.txt'),type:'text/plain'}];
+  if(navigator.canShare&&navigator.share&&window.File){
+    for(var i=0;i<essais.length;i++){
+      try{
+        var f=new File([contenu],essais[i].nom,{type:essais[i].type});
+        if(!navigator.canShare({files:[f]})) continue;
+        navigator.share({files:[f],title:'Visit answers'}).then(function(){ toast('Answers file shared.'); },function(e){
+          if(!e||e.name!=='AbortError') parLien(nom,contenu,'application/json');
+        });
+        return;
+      }catch(e){}
+    }
+  }
+  parLien(nom,contenu,'application/json');
+}
+function sectionBoard(){
+  var sec=h('section',{class:'outils'},h('h2',{text:'Team board'}));
+  if(panneau!=='envoi'){
+    sec.appendChild(h('p',{text:'At the end of the trip, each person sends their answers as a file to whoever holds the board. Nothing is uploaded: you choose who receives the file.'}));
+    sec.appendChild(h('div',{class:'rangee'},
+      etat.visits.length?h('button',{type:'button',class:'btn',text:'Send my answers',onclick:function(){ panneau='envoi'; rendreSurPlace(); }}):null,
+      h('button',{type:'button',class:'btn',text:'Open the board',onclick:function(){ aller('board'); }})));
+    return sec;
+  }
+  var erreur=h('p',{class:'erreur',role:'alert'});
+  var creerFichier=h('button',{type:'submit',class:'btn principal',text:'Create my answers file'});
+  var nom=h('input',{class:'saisie',id:'envoi-nom',type:'text',autocomplete:'name',maxlength:'60'});
+  nom.value=etat.auteur;
+  var code=h('input',{class:'saisie',id:'envoi-code',type:'text',autocomplete:'off',autocapitalize:'off',autocorrect:'off',spellcheck:'false'});
+  var form=h('form',{class:'formulaire',novalidate:true},
+    h('label',{class:'etiquette',for:'envoi-nom',text:'Your name, as it will show on the board'}),nom,
+    CRYPTO?[h('label',{class:'etiquette',for:'envoi-code',text:'Team code, optional: '+CODE_MIN+' characters or more'}),code]:null,
+    h('p',{class:'aide',text:CRYPTO?'With a team code the file is encrypted and only someone who knows the code can open it. Without one, anyone who gets the file can read it.':'Anyone who gets this file can read it.'}),
+    erreur,
+    h('div',{class:'rangee'},creerFichier,
+      h('button',{type:'button',class:'btn',text:'Cancel',onclick:function(){ panneau=''; rendreSurPlace(); }})));
+  form.addEventListener('submit',function(e){
+    e.preventDefault();
+    var n=nom.value.trim().slice(0,60), c=code.value;
+    if(!n){ erreur.textContent='Enter your name.'; return; }
+    if(c&&c.length<CODE_MIN){ erreur.textContent='The team code must be at least '+CODE_MIN+' characters, or left empty.'; return; }
+    erreur.textContent='';
+    var liberer=occuper(creerFichier,'Preparing…');
+    fichierReponses(n,c).then(function(f){
+      panneau=''; rendreSurPlace();
+      partager(f.nom,f.contenu);
+    },function(){ liberer(); erreur.textContent='The file could not be created here.'; });
+  });
+  sec.appendChild(form);
+  return sec;
+}
+
+/* ----- Recevoir les réponses des autres ----- */
+
+function ajouterReponse(o,bilan){
+  var r=normaliserReponse(o);
+  if(etat.appareil&&r.appareil===etat.appareil){ bilan.miennes++; return; }
+  for(var i=0;i<etat.board.length;i++){
+    if(etat.board[i].appareil!==r.appareil) continue;
+    if(etat.board[i].envoye>r.envoye){ bilan.anciennes++; return; }
+    etat.board[i]=r; bilan.ajoutees.push(r.auteur); return;          /* un nouvel envoi remplace le précédent */
+  }
+  if(etat.board.length>=40){ bilan.refusees++; return; }
+  etat.board.push(r); bilan.ajoutees.push(r.auteur);
+}
+function lireTexte(fic){
+  return new Promise(function(ok){
+    if(fic.size>5*1024*1024){ ok(null); return; }
+    var l=new FileReader();
+    l.onload=function(){ ok(String(l.result)); };
+    l.onerror=function(){ ok(null); };
+    l.readAsText(fic);
+  });
+}
+function nouveauBilan(){ return {ajoutees:[],miennes:0,anciennes:0,refusees:0,copies:0,illisibles:0}; }
+function direBilan(b){
+  var p=[];
+  if(b.ajoutees.length) p.push('Answers added: '+b.ajoutees.join(', ')+'.');
+  if(reponsesEnAttente.length) p.push(pluriel(reponsesEnAttente.length,'file needs','files need')+' the team code.');
+  if(b.miennes) p.push('Your own answers are already on the board.');
+  if(b.anciennes) p.push(pluriel(b.anciennes,'file is','files are')+' older than what the board already has.');
+  if(b.copies) p.push(pluriel(b.copies,'file is a backup','files are backups')+', not answers: ask for “Send my answers”.');
+  if(b.illisibles) p.push(pluriel(b.illisibles,'file is','files are')+' not an answers file.');
+  if(b.refusees) p.push('The board is full.');
+  toast(p.join(' ')||'Nothing was added.');
+}
+function ouvrirChiffrees(code,bilan){
+  var restantes=[], suite=Promise.resolve();
+  reponsesEnAttente.forEach(function(env){
+    suite=suite.then(function(){
+      return deriver(code,deb64(env.sel),env.iter).then(function(k){ return dechiffrer(env,k); })
+        .then(function(t){
+          var o=JSON.parse(t);
+          if(o&&o.reponse&&Array.isArray(o.visits)) ajouterReponse(o,bilan); else bilan.illisibles++;
+        },function(){ restantes.push(env); });
+    });
+  });
+  return suite.then(function(){ reponsesEnAttente=restantes; });
+}
+function recevoir(input){
+  var fichiers=Array.prototype.slice.call(input.files||[],0,20), bilan=nouveauBilan();
+  if(!fichiers.length) return;
+  Promise.all(fichiers.map(lireTexte)).then(function(textes){
+    textes.forEach(function(t){
+      var o=null;
+      try{ o=t===null?null:JSON.parse(t.replace(/^﻿/,'')); }catch(e){}
+      if(!o||typeof o!=='object'||Array.isArray(o)){ bilan.illisibles++; return; }
+      if(o.chiffre===true){
+        if(!enveloppeValide(o)||!CRYPTO) bilan.illisibles++;
+        else if(o.genre!=='reponse') bilan.copies++;
+        else if(reponsesEnAttente.length<20) reponsesEnAttente.push(o);
+        return;
+      }
+      if(!Array.isArray(o.visits)){ bilan.illisibles++; return; }
+      if(!o.reponse){ bilan.copies++; return; }
+      ajouterReponse(o,bilan);
+    });
+    return (codeEquipe&&reponsesEnAttente.length)?ouvrirChiffrees(codeEquipe,bilan):null;
+  }).then(function(){
+    input.value='';
+    if(bilan.ajoutees.length) sauver();
+    rendreSurPlace();
+    direBilan(bilan);
+  });
+}
+function sectionRepondants(){
+  var fichier=h('input',{type:'file',accept:'.json,.txt,application/json,text/plain',multiple:true,class:'hors','aria-hidden':'true',tabindex:'-1',id:'fichier-reponses'});
+  fichier.addEventListener('change',function(){ recevoir(fichier); });
+  var liste=h('ul',{class:'repondants'});
+  repondants().forEach(function(r){
+    var meta=r.moi?'your notes on this device':('sent '+dateCourte(r.envoye));
+    var li=h('li',null,
+      h('span',{class:'rep-nom',text:r.auteur}),
+      h('span',{class:'rep-meta',text:meta+', '+pluriel(r.visits.length,'visit','visits')}));
+    if(!r.moi){
+      li.appendChild(h('button',{type:'button',class:'retirer','aria-label':'Remove the answers from '+r.auteur,text:'×',onclick:function(){
+        var i=etat.board.indexOf(r);
+        if(i<0) return;
+        etat.board.splice(i,1); sauver(); rendreSurPlace();
+        toast('Answers removed','Undo',function(){
+          if(verrouille||etat.board.indexOf(r)>=0) return;
+          etat.board.splice(Math.min(i,etat.board.length),0,r); sauver();
+          if(vue.nom==='board') rendreSurPlace();
+        });
+      }}));
+    }
+    liste.appendChild(li);
+  });
+  var sec=h('section',{class:'bloc'},h('h3',{class:'sous-titre',text:'Respondents'}),liste);
+  if(reponsesEnAttente.length){
+    var erreur=h('p',{class:'erreur',role:'alert'});
+    var ouvrir=h('button',{type:'submit',class:'btn principal',text:'Open the files'});
+    var code=h('input',{class:'saisie',id:'code-equipe',type:'text',autocomplete:'off',autocapitalize:'off',autocorrect:'off',spellcheck:'false'});
+    var form=h('form',{class:'formulaire',novalidate:true},
+      h('label',{class:'etiquette',for:'code-equipe',text:pluriel(reponsesEnAttente.length,'file is','files are')+' protected. Team code'}),code,erreur,
+      h('div',{class:'rangee'},ouvrir,
+        h('button',{type:'button',class:'btn',text:'Cancel',onclick:function(){ reponsesEnAttente=[]; rendreSurPlace(); }})));
+    form.addEventListener('submit',function(e){
+      e.preventDefault();
+      if(!code.value){ erreur.textContent='Enter the team code.'; return; }
+      erreur.textContent='';
+      var liberer=occuper(ouvrir,'Opening…'), bilan=nouveauBilan(), c=code.value;
+      ouvrirChiffrees(c,bilan).then(function(){
+        if(bilan.ajoutees.length||bilan.miennes||bilan.anciennes){ codeEquipe=c; sauver(); }
+        if(reponsesEnAttente.length&&!bilan.ajoutees.length&&!bilan.miennes&&!bilan.anciennes){
+          liberer(); code.value='';
+          erreur.textContent='Wrong team code for '+(reponsesEnAttente.length===1?'this file':'these files')+'.';
+          return;
+        }
+        rendreSurPlace(); direBilan(bilan);
+      });
+    });
+    sec.appendChild(form);
+  }else{
+    sec.appendChild(h('div',{class:'rangee'},
+      h('button',{type:'button',class:'btn',text:'Add answers',onclick:function(){ fichier.click(); }})));
+  }
+  sec.appendChild(fichier);
+  return sec;
+}
+
+/* ----- Graphiques ----- */
+
+function figure(titre,sous){
+  var f=h('section',{class:'figure'},h('h3',{class:'sous-titre',text:titre}));
+  if(sous) f.appendChild(h('p',{class:'aide',text:sous}));
+  return f;
+}
+function rangViz(g,contenu,info){
+  /* Chaque rangée ouvre le détail de la société : toutes les valeurs y sont en tableau. */
+  return h('button',{type:'button',class:'viz-rang',title:info,'aria-label':g.nom+'. '+info,onclick:function(){ aller('board-'+g.cle); }},
+    h('span',{class:'viz-nom',text:g.nom}),contenu,h('span',{class:'viz-meta',text:info}));
+}
+function parStatut(liste,dessiner,cible){
+  /* Sans filtre, les sociétés sont rangées par statut de transfert plutôt que par couleur. */
+  var statuts=STATUTS.filter(function(s){ return liste.some(function(g){ return g.statut===s.k; }); });
+  if(filtreStatut||!statuts.length){ liste.forEach(function(g){ cible.appendChild(dessiner(g)); }); return; }
+  statuts.map(function(s){ return {t:s.t,l:liste.filter(function(g){ return g.statut===s.k; })}; })
+    .concat([{t:'Status not specified',l:liste.filter(function(g){ return !g.statut; })}])
+    .forEach(function(p){
+      if(!p.l.length) return;
+      cible.appendChild(h('h4',{class:'viz-facette',text:p.t}));
+      p.l.forEach(function(g){ cible.appendChild(dessiner(g)); });
+    });
+}
+function graphNotes(liste){
+  var f=figure('Average score','Mean of each respondent’s scores, out of 5.');
+  parStatut(parNote(liste),function(g){
+    if(g.moy===null) return rangViz(g,h('span',{class:'viz-piste'},h('span',{class:'viz-rien',text:'No scores yet'})),pluriel(g.reps.length,'answer','answers'));
+    var barre=h('span',{class:'viz-barre'});
+    barre.style.width='calc('+(g.moy/5).toFixed(4)+' * (100% - 48px))';
+    var info=pluriel(g.notes,'respondent','respondents')+(g.notes>1?', from '+nombre(g.min)+' to '+nombre(g.max):'');
+    return rangViz(g,h('span',{class:'viz-piste'},barre,h('span',{class:'viz-val',text:nombre(g.moy)})),info);
+  },f);
+  return f;
+}
+function niveau(x){ return Math.max(1,Math.min(9,Math.round(x*2)-1)); }   /* neuf teintes, une par demi-point */
+function graphCriteres(liste){
+  var f=figure('Scores by criterion','Mean per criterion, from 1 to 5. The colour scale is under the table.');
+  var ABR={capacite:'Cap.',qualite:'Qual.',procedes:'Proc.',orga:'Org.',supply:'Supp.',atelier:'Shop'};
+  var tete=h('tr',null,h('th',{scope:'col',text:'Company'}));
+  CRITERES.forEach(function(c){ tete.appendChild(h('th',{scope:'col'},h('abbr',{title:c.t,text:ABR[c.k]}))); });
+  var corps=h('tbody');
+  parNote(liste).forEach(function(g){
+    var tr=h('tr',null,h('th',{scope:'row',text:g.nom}));
+    CRITERES.forEach(function(c){
+      var x=g.criteres[c.k];
+      tr.appendChild(x===null
+        ?h('td',{class:'ch0',title:c.t+': no score',text:'–'})
+        :h('td',{class:'ch'+niveau(x),title:c.t+': '+nombre(x)+' out of 5',text:nombre(x)}));
+    });
+    corps.appendChild(tr);
+  });
+  f.appendChild(h('table',{class:'viz-grille'},h('thead',null,tete),corps));
+  var echelle=h('p',{class:'viz-echelle'},h('span',{text:'1'}));
+  for(var i=1;i<=9;i++) echelle.appendChild(h('span',{class:'viz-pastille ch'+i,'aria-hidden':'true'}));
+  echelle.appendChild(h('span',{text:'5'}));
+  f.appendChild(echelle);
+  f.appendChild(h('p',{class:'viz-meta',text:CRITERES.map(function(c){ return ABR[c.k]+' '+c.c.toLowerCase(); }).join(', ')+'.'}));
+  return f;
+}
+function graphAvis(liste){
+  var f=figure('Verdicts','How many respondents chose each verdict.');
+  var SERIES=[{k:'retenir',t:'Retain'},{k:'creuser',t:'Investigate'},{k:'ecarter',t:'Rule out'}];
+  var legende=h('p',{class:'viz-legende'});
+  SERIES.forEach(function(s){ legende.appendChild(h('span',null,h('span',{class:'viz-pastille av-'+s.k,'aria-hidden':'true'}),s.t)); });
+  f.appendChild(legende);
+  parStatut(parNote(liste),function(g){
+    var total=g.reps.length, pile=h('span',{class:'viz-pile'});
+    if(!total) return rangViz(g,h('span',{class:'viz-piste'},h('span',{class:'viz-rien',text:'No answers yet'})),'0 answers');
+    SERIES.forEach(function(s){
+      var n=g.avis[s.k];
+      if(!n) return;
+      var seg=h('span',{class:'viz-seg av-'+s.k,text:n/total>=0.15?String(n):''});
+      seg.style.flexGrow=String(n);
+      pile.appendChild(seg);
+    });
+    if(g.avis.aucun){
+      var vide=h('span',{class:'viz-seg av-aucun'});
+      vide.style.flexGrow=String(g.avis.aucun);
+      pile.appendChild(vide);
+    }
+    return rangViz(g,pile,resumeAvis(g.avis));
+  },f);
+  return f;
+}
+function graphSujets(liste){
+  var f=figure('Topics covered','Share of the prepared topics that at least one respondent covered.');
+  parStatut(parNote(liste),function(g){
+    var total=g.sujets.length;
+    if(!total) return rangViz(g,h('span',{class:'viz-piste'},h('span',{class:'viz-rien',text:'No topics prepared'})),pluriel(g.reps.length,'answer','answers'));
+    var plein=h('span',{class:'viz-plein'});
+    plein.style.width=(100*g.couverts/total).toFixed(2)+'%';
+    return rangViz(g,h('span',{class:'viz-piste'},h('span',{class:'viz-jauge'},plein),
+      h('span',{class:'viz-val large',text:g.couverts+' of '+total})),Math.round(100*g.couverts/total)+'% covered');
+  },f);
+  return f;
+}
+
+/* ----- Exports du board ----- */
+
+function texteBoard(liste){
+  var L=['Team board, '+dateCourte(Date.now()),'Respondents: '+repondants().map(function(r){ return r.auteur; }).join(', '),''];
+  parNote(liste).forEach(function(g,i){
+    var b=[];
+    if(g.moy!==null) b.push(nombre(g.moy)+'/5 ('+pluriel(g.notes,'respondent','respondents')+(g.notes>1?', from '+nombre(g.min)+' to '+nombre(g.max):'')+')');
+    if(g.four) b.push('verdicts: '+resumeAvis(g.avis));
+    if(g.sujets.length) b.push('topics covered: '+g.couverts+' of '+g.sujets.length);
+    L.push((i+1)+'. '+g.nom+(g.statut?' ['+libelleStatut(g.statut)+']':'')+(b.length?': '+b.join('; '):''));
+  });
+  return L.join('\n');
+}
+function celluleCsv(x){
+  x=String(x===null||x===undefined?'':x);
+  if(/^[=+\-@\t\r]/.test(x)) x="'"+x;                    /* pas de formule exécutée par le tableur */
+  return '"'+x.replace(/"/g,'""')+'"';
+}
+function csvBoard(liste){
+  var L=[['Company','Type','Transfer status','Respondent'].concat(CRITERES.map(function(c){ return c.c; }),
+    ['Average','Verdict','Topics covered','Topics prepared'])];
+  parNote(liste).forEach(function(g){
+    g.reps.forEach(function(e){
+      var u=sujetsUtiles(e.v);
+      L.push([g.nom,g.type.t,libelleStatut(e.v.statut),e.r.auteur]
+        .concat(CRITERES.map(function(c){ return Number(e.v.scores[c.k])||''; }),
+          [e.moy===null?'':nombre(e.moy),libelleAvis(e.v.avis),u.filter(function(s){ return s.fait; }).length,u.length]));
+    });
+  });
+  return L.map(function(l){ return l.map(celluleCsv).join(','); }).join('\r\n');
+}
+function objectifGroupe(g){
+  for(var i=0;i<g.entrees.length;i++) if(g.entrees[i].v.objectif.trim()) return g.entrees[i].v.objectif.trim();
+  return '';
+}
+function texteGroupe(g){
+  var L=[g.nom,[g.type.t,libelleStatut(g.statut),pluriel(g.reps.length,'answer','answers')].filter(Boolean).join(', ')];
+  if(objectifGroupe(g)) L.push('','Objective',objectifGroupe(g));
+  if(g.four&&g.moy!==null){
+    L.push('','Scores');
+    g.reps.forEach(function(e){
+      if(e.moy===null&&!e.v.avis) return;
+      L.push('- '+e.r.auteur+': '+(e.moy===null?'no score':nombre(e.moy)+'/5')+(e.v.avis?', '+libelleAvis(e.v.avis):''));
+    });
+  }
+  if(g.sujets.length){
+    L.push('','Topics ('+g.couverts+' of '+g.sujets.length+' covered)');
+    g.sujets.forEach(function(s){
+      L.push('- '+s.t);
+      s.reponses.forEach(function(r){
+        if(r.note) L.push('  '+r.auteur+(r.fait?'':' (not ticked)')+': '+r.note.replace(/\n/g,'\n    '));
+        else if(r.fait) L.push('  '+r.auteur+': covered, no note');
+      });
+    });
+  }
+  rubriques(g).forEach(function(rb){
+    L.push('',rb.t);
+    rb.textes.forEach(function(x){ L.push(x.auteur+': '+x.texte.replace(/\n/g,'\n  ')); });
+  });
+  return L.join('\n');
+}
+/* Les textes libres de chacun, rubrique par rubrique. */
+function rubriques(g){
+  var defs=[{t:'Hot debrief',lire:function(v){ return v.libre; }}];
+  if(g.four) CRITERES.forEach(function(c){ defs.push({t:c.t,lire:function(v){ return v.notes[c.k]||''; }}); });
+  (g.four?SYNTHESE:SYNTHESE_REUNION).forEach(function(c){ defs.push({t:c.t,lire:function(v){ return v[c.k]||''; }}); });
+  var out=[];
+  defs.forEach(function(d){
+    var textes=[];
+    g.reps.forEach(function(e){
+      var t=d.lire(e.v).trim();
+      if(t) textes.push({auteur:e.r.auteur,texte:t});
+    });
+    if(textes.length) out.push({t:d.t,textes:textes});
+  });
+  return out;
+}
+
+/* ----- Vues du board ----- */
+
+function vueBoard(){
+  var f=document.createDocumentFragment();
+  f.appendChild(boutonRetour(''));
+  var tous=groupes(), fours=tous.filter(function(g){ return g.four; });
+  f.appendChild(h('div',{class:'board-tete'},
+    h('h2',{text:'Team board'}),
+    h('p',{class:'aide',text:'Everyone’s answers, grouped by company. All of it stays on this device.'})));
+  f.appendChild(sectionRepondants());
+
+  var presents=STATUTS.filter(function(s){ return fours.some(function(g){ return g.statut===s.k; }); });
+  if(filtreStatut&&!presents.some(function(s){ return s.k===filtreStatut; })) filtreStatut='';
+  if(presents.length){
+    var choix=h('div',{class:'choix filtre',role:'group','aria-label':'Transfer status'});
+    [{k:'',t:'All'}].concat(presents).forEach(function(s){
+      choix.appendChild(h('button',{type:'button',class:filtreStatut===s.k?'pris':null,'aria-pressed':String(filtreStatut===s.k),text:s.t,
+        onclick:function(){ filtreStatut=s.k; rendreSurPlace(); }}));
+    });
+    f.appendChild(choix);
+  }
+  var vus=tous.filter(function(g){ return !filtreStatut||g.statut===filtreStatut; });
+  var fvus=vus.filter(function(g){ return g.four; });
+
+  if(!vus.length){
+    f.appendChild(h('div',{class:'vide'},
+      h('p',{class:'vide-titre',text:'Nothing to show yet.'}),
+      h('p',{text:'Name your visits, then add the answers your colleagues send you.'})));
+    return f;
+  }
+  var notes=fvus.filter(function(g){ return g.moy!==null; }).length;
+  var prepares=vus.reduce(function(a,g){ return a+g.sujets.length; },0);
+  var couverts=vus.reduce(function(a,g){ return a+g.couverts; },0);
+  f.appendChild(h('div',{class:'tuiles'},
+    h('div',{class:'tuile'},h('span',{class:'tuile-val',text:String(repondants().length)}),h('span',{class:'tuile-nom',text:'Respondents'})),
+    h('div',{class:'tuile'},h('span',{class:'tuile-val',text:notes+' of '+fvus.length}),h('span',{class:'tuile-nom',text:'Suppliers scored'})),
+    h('div',{class:'tuile'},h('span',{class:'tuile-val',text:prepares?Math.round(100*couverts/prepares)+'%':'–'}),h('span',{class:'tuile-nom',text:'Topics covered'}))));
+
+  if(fvus.length){
+    f.appendChild(graphNotes(fvus));
+    if(notes) f.appendChild(graphCriteres(fvus.filter(function(g){ return g.moy!==null; })));
+    f.appendChild(graphAvis(fvus));
+  }
+  if(prepares) f.appendChild(graphSujets(vus.filter(function(g){ return g.sujets.length; })));
+
+  var liste=h('div',{class:'liste'});
+  vus.forEach(function(g){
+    var meta=[g.type.k!=='autre'?g.type.t:'',libelleStatut(g.statut)].filter(Boolean).join(', ');
+    liste.appendChild(h('button',{type:'button',class:'ligne',onclick:function(){ aller('board-'+g.cle); }},
+      h('span',null,h('span',{class:'ligne-nom',text:g.nom}),meta?h('span',{class:'ligne-meta',text:meta}):null),
+      h('span',{class:'ligne-droite'},h('span',{class:'ligne-meta',text:pluriel(g.reps.length,'answer','answers')}))));
+  });
+  f.appendChild(h('section',{class:'figure'},h('h3',{class:'sous-titre',text:'Answers by company'}),
+    h('p',{class:'aide',text:'Open a company to read what each person answered.'}),liste));
+
+  f.appendChild(h('div',{class:'rangee fin'},
+    h('button',{type:'button',class:'btn',text:'Copy summary',onclick:function(){ copier(texteBoard(vus),'Summary copied'); }}),
+    h('button',{type:'button',class:'btn',text:'Download scores (CSV)',onclick:function(){
+      enregistrer('team-board-scores-'+aujourdhui()+'.csv','﻿'+csvBoard(fvus),'text/csv;charset=utf-8');
+    }})));
+  return f;
+}
+function trouverGroupe(cle){
+  var l=groupes();
+  for(var i=0;i<l.length;i++) if(l[i].cle===cle) return l[i];
+  return null;
+}
+function vueBoardDetail(g){
+  var f=document.createDocumentFragment();
+  f.appendChild(boutonRetour('board'));
+  f.appendChild(h('div',{class:'board-tete'},
+    h('h2',{text:g.nom}),
+    h('p',{class:'aide',text:[g.type.t,libelleStatut(g.statut),pluriel(g.reps.length,'answer','answers')].filter(Boolean).join(', ')})));
+  if(objectifGroupe(g)){
+    f.appendChild(h('section',{class:'figure'},h('h3',{class:'sous-titre',text:'Objective'}),
+      h('p',{class:'reponse-quoi',text:objectifGroupe(g)})));
+  }
+
+  if(g.four&&g.reps.length){
+    var ABR={capacite:'Cap.',qualite:'Qual.',procedes:'Proc.',orga:'Org.',supply:'Supp.',atelier:'Shop'};
+    var tete=h('tr',null,h('th',{scope:'col',text:'Respondent'}),h('th',{scope:'col',text:'Avg'}));
+    CRITERES.forEach(function(c){ tete.appendChild(h('th',{scope:'col'},h('abbr',{title:c.t,text:ABR[c.k]}))); });
+    tete.appendChild(h('th',{scope:'col',text:'Verdict'}));
+    var corps=h('tbody');
+    g.reps.forEach(function(e){
+      var tr=h('tr',null,h('td',{class:'nom-col',text:e.r.auteur}),h('td',{class:'moy',text:e.moy===null?'–':nombre(e.moy)}));
+      CRITERES.forEach(function(c){ var s=Number(e.v.scores[c.k])||0; tr.appendChild(h('td',{text:s?String(s):'–'})); });
+      tr.appendChild(h('td',null,e.v.avis?h('span',{class:'avis '+e.v.avis,text:libelleAvis(e.v.avis)}):'–'));
+      corps.appendChild(tr);
+    });
+    if(g.notes>1){
+      var pied=h('tr',{class:'pied'},h('td',{class:'nom-col',text:'Mean'}),h('td',{class:'moy',text:nombre(g.moy)}));
+      CRITERES.forEach(function(c){ var x=g.criteres[c.k]; pied.appendChild(h('td',{text:x===null?'–':nombre(x)})); });
+      pied.appendChild(h('td',{text:''}));
+      corps.appendChild(pied);
+    }
+    f.appendChild(h('section',{class:'figure'},h('h3',{class:'sous-titre',text:'Scores'}),
+      h('div',{class:'tableau'},h('table',null,h('thead',null,tete),corps))));
+  }
+
+  if(g.sujets.length){
+    var sec=h('section',{class:'figure'},h('h3',{class:'sous-titre',text:'Topics'}),
+      h('p',{class:'aide',text:g.couverts+' of '+g.sujets.length+' covered by at least one respondent.'}));
+    g.sujets.forEach(function(s){
+      var bloc=h('div',{class:'sujet-b'+(s.faits?' fait':'')},
+        h('p',{class:'sujet-b-t',text:s.t}),
+        h('p',{class:'viz-meta',text:s.faits?'Covered by '+s.faits+' of '+s.reponses.length:(s.reponses.length?'Not covered':'No answer yet')}));
+      s.reponses.forEach(function(r){
+        if(!r.note&&!r.fait) return;
+        bloc.appendChild(h('p',{class:'reponse'},
+          h('span',{class:'reponse-qui',text:r.auteur+(r.fait?'':' (not ticked)')}),
+          h('span',{class:'reponse-quoi'+(r.note?'':' sans'),text:r.note||'Covered, no note.'})));
+      });
+      sec.appendChild(bloc);
+    });
+    f.appendChild(sec);
+  }
+
+  rubriques(g).forEach(function(rb){
+    var sec=h('section',{class:'figure'},h('h3',{class:'sous-titre',text:rb.t}));
+    rb.textes.forEach(function(x){
+      sec.appendChild(h('p',{class:'reponse'},
+        h('span',{class:'reponse-qui',text:x.auteur}),h('span',{class:'reponse-quoi',text:x.texte})));
+    });
+    f.appendChild(sec);
+  });
+
+  f.appendChild(h('div',{class:'rangee fin'},
+    h('button',{type:'button',class:'btn',text:'Copy all answers',onclick:function(){ copier(texteGroupe(g),'Answers copied'); }})));
+  return f;
+}
+
 /* ---------- Actions ---------- */
 
 function creer(){
@@ -1296,7 +1987,8 @@ function lireCopie(input){
   var lecteur=new FileReader();
   lecteur.onload=function(){
     var d=interpreter(String(lecteur.result));
-    if(d.type==='clair') fusionner(d.etat.visits,d.table);
+    if(d.reponse) toast('This is an answers file, not a backup. Add it from the Team board.');
+    else if(d.type==='clair') fusionner(d.etat.visits,d.table);
     else if(d.type==='chiffre'){
       if(CRYPTO){ copieEnAttente=d.env; rendre(); }
       else toast('This browser cannot open a locked backup.');
@@ -1313,6 +2005,8 @@ function lireCopie(input){
 function routeDepuis(r){
   if(r==='comparer'&&fournisseurs().length) return {nom:'comparer',id:null};
   if(r.indexOf('visite-')===0&&trouver(r.slice(7))) return {nom:'visite',id:r.slice(7)};
+  if(r==='board') return {nom:'board',id:null};
+  if(r.indexOf('board-')===0) return trouverGroupe(r.slice(6))?{nom:'detail',id:r.slice(6)}:{nom:'board',id:null};
   return {nom:'liste',id:null};
 }
 function rendre(){
@@ -1323,6 +2017,8 @@ function rendre(){
   if(verrouille) cible.appendChild(vueVerrou());
   else if(v) cible.appendChild(vueVisite(v));
   else if(vue.nom==='comparer'&&fournisseurs().length) cible.appendChild(vueComparer());
+  else if(vue.nom==='board') cible.appendChild(vueBoard());
+  else if(vue.nom==='detail'&&trouverGroupe(vue.id)) cible.appendChild(vueBoardDetail(trouverGroupe(vue.id)));
   else cible.appendChild(vueListe());
   var zones=cible.querySelectorAll('textarea');
   for(var i=0;i<zones.length;i++) if(!zones[i].hidden) grandir(zones[i]);
@@ -1341,6 +2037,7 @@ function afficherRoute(){
   if(minuteur) sauver();
   reafficher();
   if(vue.nom!=='liste'){ panneau=''; copieEnAttente=null; }
+  if(vue.nom!=='board') reponsesEnAttente=[];
   window.scrollTo(0,0);
 }
 function aller(route){

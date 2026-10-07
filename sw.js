@@ -2,7 +2,7 @@
    Les fichiers sont mis en cache tous ensemble à l'installation, puis servis depuis ce cache :
    une mise à jour ne s'applique que si tous les fichiers ont pu être téléchargés.
    Changer VERSION à chaque modification d'un fichier de l'app. */
-var VERSION = 'carnet-visites-v6';
+var VERSION = 'carnet-visites-v7';
 var FICHIERS = [
   './',
   './app.css',

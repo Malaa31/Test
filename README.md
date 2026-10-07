@@ -12,6 +12,10 @@ Les sujets types proposés par métier (usinage, traitement de surface, traiteme
 - Avec le verrou, la copie de secours est chiffrée elle aussi. Les comptes rendus exportés en texte, eux, sont en clair : c'est leur but.
 - Le bouton « Dicter » est désactivé par défaut, car il envoie la voix au service vocal du navigateur. Le micro du clavier fonctionne dans tous les champs.
 
+## Board d'équipe
+
+À la fin d'un déplacement, chacun crée un fichier de réponses (« Send my answers ») et l'envoie à la personne qui tient le board, par le canal de son choix. Le board regroupe les réponses par société, sur l'appareil de cette personne : note moyenne, matrice des critères, répartition des avis, couverture des sujets, détail des réponses de chacun, export en texte et en CSV. Il n'y a toujours aucun serveur : un fichier de réponses ne quitte un téléphone que si son propriétaire le partage, et il peut être chiffré par un code d'équipe.
+
 ## Hors ligne
 
 Une fois ouverte une première fois avec du réseau, l'app s'ouvre ensuite sans connexion. Pour l'installer : ouvrir la page sur le téléphone, puis « Ajouter à l'écran d'accueil ».
