@@ -239,6 +239,19 @@ function tableValide(o){
   });
   return n?t:null;
 }
+/* Notes à ajouter à des fiches existantes, fournies par un fichier importé : validées avant usage. */
+function ajoutsValides(a){
+  if(!Array.isArray(a)) return null;
+  var out=[];
+  a.slice(0,60).forEach(function(x){
+    if(!x||typeof x!=='object'||Array.isArray(x)) return;
+    var t=texte(x.texte,20000).trim(), nom=texte(x.nom,300).trim();
+    var id=texte(x.id,40).replace(/[^A-Za-z0-9_-]/g,'');
+    if(!t||(!id&&!nom)) return;
+    out.push({id:id,nom:nom,type:typeConnu(texte(x.type,20))?texte(x.type,20):'autre',texte:t});
+  });
+  return out.length?out:null;
+}
 function horodatage(x,defaut){
   x=Number(x);
   return (isFinite(x)&&x>0)?x:defaut;
@@ -360,7 +373,8 @@ function interpreter(s){
   try{ o=JSON.parse(String(s).replace(/^\uFEFF/,'')); }catch(e){ return {type:'illisible'}; }
   if(!o||typeof o!=='object'||Array.isArray(o)) return {type:'illisible'};
   if(o.chiffre===true) return enveloppeValide(o)?{type:'chiffre',env:o,reponse:o.genre==='reponse'}:{type:'illisible'};
-  if(Array.isArray(o.visits)) return {type:'clair',etat:normaliserEtat(o),table:tableValide(o.traductions),reponse:!!o.reponse};
+  var ajouts=ajoutsValides(o.ajouts);
+  if(Array.isArray(o.visits)||ajouts) return {type:'clair',etat:normaliserEtat(o),table:tableValide(o.traductions),reponse:!!o.reponse,ajouts:ajouts};
   return {type:'illisible'};
 }
 function sauver(){
@@ -935,7 +949,7 @@ function sectionCopie(){
         .then(function(t){
           var o=JSON.parse(t);
           copieEnAttente=null;
-          fusionner(Array.isArray(o.visits)?o.visits:[],tableValide(o.traductions));
+          fusionner(Array.isArray(o.visits)?o.visits:[],tableValide(o.traductions),ajoutsValides(o.ajouts));
         },function(){
           liberer(); champ[1].value='';
           erreur.textContent='Wrong passcode for this backup.';
@@ -1964,7 +1978,29 @@ function traduire(table){
   });
   return n;
 }
-function fusionner(liste,table){
+/* Ajoute des notes au débrief des fiches visées, sans rien remplacer : ni texte, ni coches, ni notes.
+   La fiche est retrouvée par son identifiant, sinon par son nom ; à défaut elle est créée.
+   Un texte déjà présent n'est pas ajouté une seconde fois. */
+function appliquerAjouts(ajouts){
+  var b={ajoutes:0,creees:0,deja:0};
+  (ajouts||[]).forEach(function(a){
+    var v=a.id?trouver(a.id):null, cle=cleNom(a.nom);
+    if(!v&&cle){
+      for(var i=0;i<etat.visits.length&&!v;i++) if(cleNom(etat.visits[i].nom)===cle) v=etat.visits[i];
+    }
+    if(!v){
+      if(!a.nom) return;
+      v=normaliser({nom:a.nom,type:a.type,libre:a.texte});
+      etat.visits.push(v); b.creees++;
+      return;
+    }
+    if(v.libre.indexOf(a.texte)>=0){ b.deja++; return; }
+    v.libre=v.libre.replace(/\s+$/,'')+(v.libre.trim()?'\n\n':'')+a.texte;
+    v.maj=Date.now(); b.ajoutes++;
+  });
+  return b;
+}
+function fusionner(liste,table,ajouts){
   var ajout=0, garde=0;
   liste.slice(0,500).forEach(function(x){
     var v=normaliser(x), i=indexDe(v.id);
@@ -1973,9 +2009,21 @@ function fusionner(liste,table){
     else garde++;
   });
   var traduits=traduire(table);
-  if(ajout||traduits) sauver();
+  var notes=appliquerAjouts(ajouts);
+  if(ajout||traduits||notes.ajoutes||notes.creees) sauver();
   rendre();
   var suite=traduits?traduits+(traduits>1?' texts translated':' text translated'):'';
+  if(ajouts){
+    var p=[];
+    if(ajout) p.push(ajout+(ajout>1?' visits restored':' visit restored'));
+    if(notes.ajoutes) p.push('notes added to '+pluriel(notes.ajoutes,'visit','visits'));
+    if(notes.creees) p.push(pluriel(notes.creees,'new visit','new visits')+' created');
+    if(notes.deja) p.push(pluriel(notes.deja,'visit','visits')+' already had these notes');
+    if(suite) p.push(suite);
+    var m=p.join(', ');
+    toast(m?m.charAt(0).toUpperCase()+m.slice(1)+'. Nothing was replaced.':'There was nothing to add.');
+    return;
+  }
   if(!ajout&&traduits) toast(suite+'.');
   else if(!ajout) toast(garde?'Nothing to restore: your notes are already up to date.':'This backup contains no visits.');
   else toast(ajout+(ajout>1?' visits restored':' visit restored')+(garde?', '+garde+' already up to date':'')+(suite?', '+suite:''));
@@ -1988,7 +2036,7 @@ function lireCopie(input){
   lecteur.onload=function(){
     var d=interpreter(String(lecteur.result));
     if(d.reponse) toast('This is an answers file, not a backup. Add it from the Team board.');
-    else if(d.type==='clair') fusionner(d.etat.visits,d.table);
+    else if(d.type==='clair') fusionner(d.etat.visits,d.table,d.ajouts);
     else if(d.type==='chiffre'){
       if(CRYPTO){ copieEnAttente=d.env; rendre(); }
       else toast('This browser cannot open a locked backup.');
