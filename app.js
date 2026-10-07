@@ -239,16 +239,37 @@ function tableValide(o){
   });
   return n?t:null;
 }
-/* Notes à ajouter à des fiches existantes, fournies par un fichier importé : validées avant usage. */
+/* Notes à ajouter à des fiches existantes, fournies par un fichier importé : validées avant usage.
+   "champs" : texte ajouté à la suite d'une rubrique. "siVide" : valeur posée seulement si la case est vide. */
+var RUBRIQUES_TEXTE=['libre','forts','risques','suites'];
+function estCritere(k){
+  for(var i=0;i<CRITERES.length;i++) if(CRITERES[i].k===k) return true;
+  return false;
+}
 function ajoutsValides(a){
   if(!Array.isArray(a)) return null;
   var out=[];
   a.slice(0,60).forEach(function(x){
     if(!x||typeof x!=='object'||Array.isArray(x)) return;
-    var t=texte(x.texte,20000).trim(), nom=texte(x.nom,300).trim();
-    var id=texte(x.id,40).replace(/[^A-Za-z0-9_-]/g,'');
-    if(!t||(!id&&!nom)) return;
-    out.push({id:id,nom:nom,type:typeConnu(texte(x.type,20))?texte(x.type,20):'autre',texte:t});
+    var nom=texte(x.nom,300).trim(), id=texte(x.id,40).replace(/[^A-Za-z0-9_-]/g,'');
+    var src=(x.champs&&typeof x.champs==='object'&&!Array.isArray(x.champs))?x.champs:{};
+    var champs={}, n=0;
+    RUBRIQUES_TEXTE.concat(CRITERES.map(function(c){ return c.k; })).forEach(function(k){
+      var t=possede(src,k)?texte(src[k],20000).trim():'';
+      if(k==='libre'&&!t) t=texte(x.texte,20000).trim();          /* ancien format : tout dans le débrief */
+      if(t){ champs[k]=t; n++; }
+    });
+    var sv=(x.siVide&&typeof x.siVide==='object'&&!Array.isArray(x.siVide))?x.siVide:{}, siVide={};
+    ['ville','contacts','activite','objectif'].forEach(function(k){
+      var t=possede(sv,k)?texte(sv[k],1000).trim():'';
+      if(t){ siVide[k]=t; n++; }
+    });
+    var d=texte(sv.date,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)){ siVide.date=d; n++; }
+    var type=texte(possede(sv,'type')?sv.type:x.type,20);
+    if(typeConnu(type)&&type!=='autre'){ siVide.type=type; n++; }
+    if(!n||(!id&&!nom)) return;
+    out.push({id:id,nom:nom,champs:champs,siVide:siVide});
   });
   return out.length?out:null;
 }
@@ -1978,25 +1999,38 @@ function traduire(table){
   });
   return n;
 }
-/* Ajoute des notes au débrief des fiches visées, sans rien remplacer : ni texte, ni coches, ni notes.
-   La fiche est retrouvée par son identifiant, sinon par son nom ; à défaut elle est créée.
-   Un texte déjà présent n'est pas ajouté une seconde fois. */
+/* Ajoute des notes aux fiches visées, rubrique par rubrique, sans rien remplacer : le texte déjà saisi
+   reste en tête, les coches et les notes ne bougent pas. La fiche est retrouvée par son identifiant,
+   sinon par son nom ; à défaut elle est créée. Un texte déjà présent n'est pas ajouté une seconde fois. */
 function appliquerAjouts(ajouts){
   var b={ajoutes:0,creees:0,deja:0};
   (ajouts||[]).forEach(function(a){
-    var v=a.id?trouver(a.id):null, cle=cleNom(a.nom);
+    var v=a.id?trouver(a.id):null, cle=cleNom(a.nom), k;
     if(!v&&cle){
       for(var i=0;i<etat.visits.length&&!v;i++) if(cleNom(etat.visits[i].nom)===cle) v=etat.visits[i];
     }
     if(!v){
       if(!a.nom) return;
-      v=normaliser({nom:a.nom,type:a.type,libre:a.texte});
-      etat.visits.push(v); b.creees++;
+      var neuf={nom:a.nom,notes:{}};
+      for(k in a.siVide) if(possede(a.siVide,k)) neuf[k]=a.siVide[k];
+      for(k in a.champs) if(possede(a.champs,k)){ if(estCritere(k)) neuf.notes[k]=a.champs[k]; else neuf[k]=a.champs[k]; }
+      etat.visits.push(normaliser(neuf)); b.creees++;
       return;
     }
-    if(v.libre.indexOf(a.texte)>=0){ b.deja++; return; }
-    v.libre=v.libre.replace(/\s+$/,'')+(v.libre.trim()?'\n\n':'')+a.texte;
-    v.maj=Date.now(); b.ajoutes++;
+    var change=false;
+    for(k in a.champs){
+      if(!possede(a.champs,k)) continue;
+      var cible=estCritere(k)?v.notes:v, actuel=cible[k]||'', t=a.champs[k];
+      if(actuel.indexOf(t)>=0) continue;
+      cible[k]=actuel.replace(/\s+$/,'')+(actuel.trim()?(k==='libre'?'\n\n':'\n'):'')+t;
+      change=true;
+    }
+    for(k in a.siVide){
+      if(!possede(a.siVide,k)) continue;
+      if(k==='type'){ if(v.type==='autre'){ v.type=a.siVide.type; change=true; } }
+      else if(!String(v[k]||'').trim()){ v[k]=a.siVide[k]; change=true; }
+    }
+    if(change){ v.maj=Date.now(); b.ajoutes++; } else b.deja++;
   });
   return b;
 }
